@@ -191,6 +191,13 @@ $item->cssClass = 'minwidth500';
 $item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
 $item->fieldParams['forcereload'] = 1;
 
+// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
+// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
+// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
+$item = $formSetup->newItem('EINVOICING_ALLOW_RESEND_TRANSMITTED')->setAsYesNo();
+$item->defaultFieldValue = '0';
+$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP');
+
 // End of selection of platform partner
 
 

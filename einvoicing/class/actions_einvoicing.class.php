@@ -215,6 +215,11 @@ class ActionsEInvoicing extends CommonHookActions
 			// Get current status of e-invoice
 			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
+			// Already transmitted to the PA (persistent flow_id): regenerate/re-send are locked by default
+			// (immutable invoice; correct with a credit note / corrective invoice). Opt out with
+			// EINVOICING_ALLOW_RESEND_TRANSMITTED.
+			$locked = $einvoicing->isTransmittedLockActive($object->id, $object->ref);
+
 			$url_button = array();
 
 			if ($object->status == Facture::STATUS_VALIDATED || $object->status == Facture::STATUS_CLOSED) {
@@ -235,7 +240,7 @@ class ActionsEInvoicing extends CommonHookActions
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
 				// display the button to regenerate the e-invoice
-				if (in_array($currentStatusDetails['code'], [
+				if (!$locked && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN
@@ -255,12 +260,15 @@ class ActionsEInvoicing extends CommonHookActions
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
 				// display the button to regenerate the e-invoice
-				if (in_array($currentStatusDetails['code'], [
+				// Re-send is offered for not-yet-transmitted states, plus AWAITING_* as a deliberate retry
+				// affordance. Once REALLY transmitted (persistent flow_id), it is locked by default unless
+				// EINVOICING_ALLOW_RESEND_TRANSMITTED is set ($locked already accounts for that opt-out).
+				if (!$locked && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN,
-					$einvoicing::STATUS_AWAITING_VALIDATION,		// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
-					$einvoicing::STATUS_AWAITING_ACK				// We may retry to resend. We should get an error if we do, but it is interesting to test the retry.
+					$einvoicing::STATUS_AWAITING_VALIDATION,		// retry affordance (PA will refuse a duplicate)
+					$einvoicing::STATUS_AWAITING_ACK				// retry affordance (PA will refuse a duplicate)
 				])) {
 					$url_button[] = array(
 						'lang' => 'einvoicing',
@@ -396,6 +404,17 @@ class ActionsEInvoicing extends CommonHookActions
 				}
 			}
 
+			// An invoice already transmitted to the Access Point (a flow_id is assigned, by any provider) is
+			// immutable: re-sending it makes the PA refuse a duplicate, and regenerating it would only reset
+			// the local status and re-open that trap. Block both by default; correct a transmitted invoice
+			// with a credit note / corrective invoice. The operator can opt in (e.g. to test PA retry) via
+			// EINVOICING_ALLOW_RESEND_TRANSMITTED. Based on the persistent flow_id, not the resettable status.
+			if (in_array($action, array('send_to_pdp', 'generate_einvoice')) && isset($currentStatusDetails)
+				&& $einvoicing->isTransmittedLockActive($object->id, $object->ref)) {
+				setEventMessages($langs->trans('EInvoiceAlreadyTransmittedLocked', $currentStatusDetails['flow_id']), null, 'warnings');
+				$action = '';
+			}
+
 			// Action to send invoice to Access Point
 			if (
 				$action == 'send_to_pdp' && $permissiontoedit
@@ -432,8 +451,9 @@ class ActionsEInvoicing extends CommonHookActions
 						$messages[] = $langs->trans("InvoiceSuccessfullySentToPDP");
 						$messages[] = $langs->trans("FlowId") . ": " . $result;
 						setEventMessages('', $messages, 'mesgs');
-						// TODO: Review and update the invoice workflow.
-						// The "Modify" button may need to be disabled once the E-invoice has been sent and distributed by the PDP.
+						// Once transmitted, the invoice is locked from re-edit/regenerate/re-send: the
+						// BILL_UNVALIDATE / BILL_MODIFY triggers and the guards above key on the persistent
+						// flow_id (EInvoicing::isTransmittedLockActive), overridable via EINVOICING_ALLOW_RESEND_TRANSMITTED.
 					} else {
 						$error++;
 						$this->error = $provider->error;
