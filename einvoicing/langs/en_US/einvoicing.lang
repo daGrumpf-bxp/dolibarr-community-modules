@@ -381,3 +381,4 @@ ReasonAntivirusControl=Antivirus control
 EInvoiceAlreadyTransmittedLocked=This invoice has already been transmitted to the Access Point (flow %s). A transmitted invoice is immutable: issue a credit note or a corrective invoice to amend it. You can enable re-sending in the module setup to test the platform retry behaviour.
 EINVOICING_ALLOW_RESEND_TRANSMITTED=Allow re-sending an already transmitted invoice
 EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP=Off by default. A transmitted invoice is immutable; correct it with a credit note or a corrective invoice. Enable only to deliberately test the Access Point retry behaviour (re-sending will be refused as a duplicate).
+EInvoiceTransmittedModifyDisabled=This invoice has been transmitted to the Access Point and can no longer be modified. Issue a credit note or a corrective invoice to amend it.
