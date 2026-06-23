@@ -235,6 +235,76 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Resolve the e-invoicing addressing identifier(s) of a company from the PA directory (annuaire).
+	 *
+	 * Looks a company up in the AFNOR Z12-013 directory and returns its directory lines (an addressing
+	 * identifier is the routable destination of an e-invoice / lifecycle status, never a guessed suffix).
+	 * The base class returns an empty list: providers that expose a directory override this method.
+	 *
+	 * @param  string $siren  9-digit SIREN to look up
+	 * @param  string $siret  Optional 14-digit SIRET to narrow the search
+	 * @return array<int,array{addressingIdentifier:string,directoryLineStatus:string,platformType:string,routingCode:string,addressingSuffix:string,siren:string,siret:string}>  Directory lines (empty array if none, not supported, or on error)
+	 */
+	public function resolveRoutingId($siren, $siret = '')
+	{
+		return array();
+	}
+
+	/**
+	 * Build the request body for a directory-line/search call (shared by all providers exposing the
+	 * AFNOR directory). Filters are exact matches ("strict"); "contains" is intentionally avoided as it
+	 * is rejected by some PA as too broad.
+	 *
+	 * @param  string $siren  9-digit SIREN to filter on
+	 * @param  string $siret  Optional 14-digit SIRET to filter on
+	 * @param  int    $limit  Max number of lines to return
+	 * @return array<string,mixed>  Body ready to be json_encode'd
+	 */
+	protected function buildDirectorySearchBody($siren, $siret = '', $limit = 30)
+	{
+		$filters = array('siren' => array('op' => 'strict', 'value' => (string) $siren));
+		if (!empty($siret)) {
+			$filters['siret'] = array('op' => 'strict', 'value' => (string) $siret);
+		}
+		return array('filters' => $filters, 'limit' => (int) $limit);
+	}
+
+	/**
+	 * Normalize the directory-line/search response into a flat list of lines.
+	 *
+	 * Tolerant to the two total keys seen in the wild: "totalNumberOfResults" (SuperPDP, camelCase) and
+	 * "total_number_results" (Esalink/Hubtimize, snake_case). Line fields are camelCase on both PA.
+	 *
+	 * @param  mixed  $responseBody  Decoded response body (array expected) returned by callApi
+	 * @param  string $sirenFallback SIREN to use when a line omits it
+	 * @return array<int,array{addressingIdentifier:string,directoryLineStatus:string,platformType:string,routingCode:string,addressingSuffix:string,siren:string,siret:string}>
+	 */
+	protected function parseDirectoryLines($responseBody, $sirenFallback = '')
+	{
+		if (!is_array($responseBody) || empty($responseBody['results']) || !is_array($responseBody['results'])) {
+			return array();
+		}
+
+		$lines = array();
+		foreach ($responseBody['results'] as $line) {
+			if (!is_array($line)) {
+				continue;
+			}
+			$lines[] = array(
+				'addressingIdentifier' => (string) ($line['addressingIdentifier'] ?? ''),
+				'directoryLineStatus'  => (string) ($line['directoryLineStatus'] ?? ''),
+				'platformType'         => (string) ($line['platformType'] ?? ''),
+				'routingCode'          => (string) ($line['routingCode'] ?? ''),
+				'addressingSuffix'     => (string) ($line['addressingSuffix'] ?? ''),
+				'siren'                => (string) ($line['siren'] ?? $sirenFallback),
+				'siret'                => (string) ($line['siret'] ?? ''),
+			);
+		}
+
+		return $lines;
+	}
+
+	/**
 	 * Send a sample electronic invoice for testing purposes.
 	 * This function generates a sample invoice and sends it to PDP
 	 *

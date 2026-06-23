@@ -708,6 +708,34 @@ class SuperPDPProvider extends AbstractPDPProvider
 		return $returnarray;
 	}
 
+	/**
+	 * Resolve the e-invoicing addressing identifier(s) of a company from the SuperPDP AFNOR directory.
+	 *
+	 * SuperPDP exposes the AFNOR Z12-013 directory on its own base (afnor-directory/v1) — same host as
+	 * the Flow API but a different path — so callApi('...', ..., 'resolve_routing') reroutes accordingly.
+	 *
+	 * @param  string $siren  9-digit SIREN to look up
+	 * @param  string $siret  Optional 14-digit SIRET to narrow the search
+	 * @return array<int,array{addressingIdentifier:string,directoryLineStatus:string,platformType:string,routingCode:string,addressingSuffix:string,siren:string,siret:string}>  Directory lines (empty array if none / on error)
+	 */
+	public function resolveRoutingId($siren, $siret = '')
+	{
+		$siren = preg_replace('/\s+/', '', (string) $siren);
+		if ($siren === '') {
+			return array();
+		}
+
+		$body = $this->buildDirectorySearchBody($siren, $siret);
+		$response = $this->callApi('directory-line/search', 'POST', json_encode($body), [], 'resolve_routing');
+
+		if (($response['status_code'] ?? 0) != 200 && ($response['status_code'] ?? 0) != 202) {
+			dol_syslog(__METHOD__ . " directory lookup failed for SIREN " . $siren . " http_code=" . ($response['status_code'] ?? 0), LOG_WARNING, 0, "_einvoicing");
+			return array();
+		}
+
+		return $this->parseDirectoryLines($response['response'] ?? null, $siren);
+	}
+
 
 	/**
 	 * Send an electronic invoice.
@@ -1029,7 +1057,15 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 		// The OAuth token endpoint lives on the auth base (/oauth2/), not the Flow API base. This applies to
 		// every token grant: client_credentials, authorization_code and refresh_token.
-		$url = $this->getApiUrl(($resource == 'token' || $callType == 'get_access_token') ? 'auth' : 'api') . $resource;
+		// The AFNOR directory (annuaire) lives on yet another base (afnor-directory/v1) distinct from the
+		// Flow API base (afnor-flow/v1) — same host, different path — so route directory calls there.
+		if ($resource == 'token' || $callType == 'get_access_token') {
+			$url = $this->getApiUrl('auth') . $resource;
+		} elseif ($callType == 'resolve_routing') {
+			$url = str_replace('afnor-flow/v1/', 'afnor-directory/v1/', $this->getApiUrl('api')) . $resource;
+		} else {
+			$url = $this->getApiUrl('api') . $resource;
+		}
 
 		if (!isset($extraHeaders['Content-Type'])) {
 			$httpheader[] = 'Content-Type: application/json';
