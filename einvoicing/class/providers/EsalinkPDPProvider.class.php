@@ -368,6 +368,34 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		return array('res' => 0, 'message' => $langs->trans('skipped'));
 	}
 
+
+	/**
+	 * Resolve the e-invoicing addressing identifier(s) of a company from the Esalink/Hubtimize directory.
+	 *
+	 * The AFNOR directory shares the same orchestrator base as the flows, so no URL override is needed.
+	 *
+	 * @param  string $siren  9-digit SIREN to look up
+	 * @param  string $siret  Optional 14-digit SIRET to narrow the search
+	 * @return array<int,array{addressingIdentifier:string,directoryLineStatus:string,platformType:string,routingCode:string,addressingSuffix:string,siren:string,siret:string}>  Directory lines (empty array if none / on error)
+	 */
+	public function resolveRoutingId($siren, $siret = '')
+	{
+		$siren = preg_replace('/\s+/', '', (string) $siren);
+		if ($siren === '') {
+			return array();
+		}
+
+		$body = $this->buildDirectorySearchBody($siren, $siret);
+		$response = $this->callApi('directory-line/search', 'POST', json_encode($body), [], 'resolve_routing');
+
+		if (($response['status_code'] ?? 0) != 200 && ($response['status_code'] ?? 0) != 202) {
+			dol_syslog(__METHOD__ . " directory lookup failed for SIREN " . $siren . " http_code=" . ($response['status_code'] ?? 0), LOG_WARNING, 0, "_einvoicing");
+			return array();
+		}
+
+		return $this->parseDirectoryLines($response['response'] ?? null, $siren);
+	}
+
 	/**
 	 * Send an electronic invoice.
 	 *
