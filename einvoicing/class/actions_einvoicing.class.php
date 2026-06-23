@@ -239,8 +239,12 @@ class ActionsEInvoicing extends CommonHookActions
 				}
 
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
-				// display the button to regenerate the e-invoice
-				if (!$locked && in_array($currentStatusDetails['code'], [
+				// display the button to regenerate the e-invoice.
+				// EINVOICING_ENABLE_DEV_CII_REGEN forces the regenerate button even on a transmitted-locked
+				// invoice (dev only: lets you rebuild the CII/Factur-X to inspect the XML; nothing is re-sent).
+				if (getDolGlobalString('EINVOICING_ENABLE_DEV_CII_REGEN')) {
+					$perm = (bool) $user->hasRight("facture", "creer");
+				} elseif (!$locked && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN
@@ -422,7 +426,12 @@ class ActionsEInvoicing extends CommonHookActions
 			// the local status and re-open that trap. Block both by default; correct a transmitted invoice
 			// with a credit note / corrective invoice. The operator can opt in (e.g. to test PA retry) via
 			// EINVOICING_ALLOW_RESEND_TRANSMITTED. Based on the persistent flow_id, not the resettable status.
-			if (in_array($action, array('send_to_pdp', 'generate_einvoice')) && isset($currentStatusDetails)
+			// EINVOICING_ENABLE_DEV_CII_REGEN keeps regenerate (generate_einvoice) available on a
+			// transmitted-locked invoice for dev/inspection; re-sending (send_to_pdp) stays locked.
+			$lockedActions = getDolGlobalString('EINVOICING_ENABLE_DEV_CII_REGEN')
+				? array('send_to_pdp')
+				: array('send_to_pdp', 'generate_einvoice');
+			if (in_array($action, $lockedActions) && isset($currentStatusDetails)
 				&& $einvoicing->isTransmittedLockActive($object->id, $object->ref)) {
 				setEventMessages($langs->trans('EInvoiceAlreadyTransmittedLocked', $currentStatusDetails['flow_id']), null, 'warnings');
 				$action = '';
