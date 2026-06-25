@@ -221,6 +221,21 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
 	$item->defaultFieldValue = 0;
 	$item->cssClass = 'minwidth500';
+
+	// Allow re-sending / re-editing an invoice already transmitted to the Access Point. Off by default:
+	// a transmitted invoice is immutable (correct it with a credit note / corrective invoice), and re-sending
+	// makes the PA refuse a duplicate. Turn on only to deliberately test PA retry behaviour.
+	$item = $formSetup->newItem('EINVOICING_ALLOW_RESEND_TRANSMITTED')->setAsYesNo();
+	$item->defaultFieldValue = '0';
+	$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_RESEND_TRANSMITTED_HELP');
+	$item->cssClass = 'minwidth500';
+
+	// Dev-only: keep the "Regenerate e-invoice" button/action available on a transmitted-locked invoice
+	// (rebuild the CII/Factur-X to inspect the XML). Re-sending stays locked. Off by default.
+	$item = $formSetup->newItem('EINVOICING_ALLOW_REGEN_TRANSMITTED')->setAsYesNo();
+	$item->defaultFieldValue = '0';
+	$item->helpText = $langs->transnoentities('EINVOICING_ALLOW_REGEN_TRANSMITTED_HELP');
+	$item->cssClass = 'minwidth500';
 }
 
 
