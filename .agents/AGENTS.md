@@ -38,7 +38,8 @@ External module structure:
 ├── `test/`
 └── `tpl/`
 
-A template of an external module directory content can be found in the `htdocs/modulebuilder/template` folder of this project.
+Do not explore other directories than the workdir (that contains external modules) and the directory of Dolibarr project (that is in is ~/git/dolibarr or ~/git/dolibarr_dev). 
+A template of an external module directory content can be found in the `htdocs/modulebuilder/template` folder of the Dolibarr project.
 
 ---
 
@@ -109,9 +110,10 @@ Before any modification, verify:
 - User rights enforcement (`$user->hasRights("module", "permission")` or `$user->hasRights("module", "objectname", "permission")`)
 - Multi-entity compatibility (add ` AND entity IN ('.getDolEntity("tablename").')`)
 
-If possible:
-- If doing an external module, add a PHPUnit test file in `yourmoduledir/test/phpunit/`
-- If modifying the Dolibarr code project, add a PHPUnit test file into `test/phpunit/` and add the entry into file `test/phpunit/AllTests.php`.
+If possible and if it was explicitely requested:
+- If making or modifying external module, add PHPUnit test files in `yourmoduledir/test/phpunit/`.
+- If you need to validate code change or if it is explicitely requested, you can check code and dev syntax rules by running the following command on modified files (it takes a long time):
+	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --analyze-twice --minimum-target-php-version 7.2 --exclude-directory-list=dev/tools,mymodule/test/,mymodule/doc/,mymodule/langs/,mymodule/vendor/ --output-mode=checkstyle filemodified1.php filemodified2.php ...`
 
 
 ---
