@@ -137,6 +137,8 @@ class AllTests
 		$suite->addTestSuite('TransmittedLockTest');
 		require_once dirname(__FILE__).'/VatPointDateCodeTest.php';
 		$suite->addTestSuite('VatPointDateCodeTest');
+		require_once dirname(__FILE__).'/XmlSourceHighlightTest.php';
+		$suite->addTestSuite('XmlSourceHighlightTest');
 
 		return $suite;
 	}

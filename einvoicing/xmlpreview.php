@@ -80,6 +80,7 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 include_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 dol_include_once('/einvoicing/class/einvoicing.class.php');
+dol_include_once('/einvoicing/lib/xmlhighlight.lib.php');
 
 // Load translation files required by the page
 $langs->loadLangs(array("einvoicing@einvoicing", "bills", "suppliers", "other"));
@@ -148,13 +149,15 @@ if ($xml !== '' && substr_count($xml, "\n") <= 2) {
 $title = $langs->trans("EInvoiceXmlPreviewTitle");
 
 // What the page has to say, whatever the mode it is asked in.
+// The source is coloured, numbered and foldable, the way a browser shows an XML document it displays
+// itself - on a CII invoice, several hundred lines of the same colour is not something anyone reads.
+// einvoicingXmlSourceToHtml() escapes every token of the file with htmlspecialchars() and writes the
+// only tags of the result itself, so nothing of the document can act as markup.
 // htmlspecialchars() and not dol_escape_htmltag(): the point of this page is to show the file as it is,
 // and dol_escape_htmltag() would not. It drops the tags it does not keep (an element named b or br would
 // disappear from the display), it turns the newlines into a literal backslash-n, and it runs
 // html_entity_decode() first, so an escaped character of the XML (&#233;) would be shown decoded instead
 // of as it is written in the file.
-// pre-wrap and not pre: the namespace declarations of a CII root element make a line several hundred
-// characters long, which would otherwise scroll the whole page sideways.
 if (empty($einvoicefile)) {
 	$body = '<div class="opacitymedium">'.$langs->trans($issupplier ? "EInvoiceNoReceivedFileToPreview" : "EInvoiceNoFileToPreview").'</div>';
 } else {
@@ -163,9 +166,8 @@ if (empty($einvoicefile)) {
 		$body .= ' &mdash; '.dol_escape_htmltag($langs->trans("EInvoiceXmlReindented"));
 	}
 	$body .= '</div>';
-	$body .= '<pre style="white-space: pre-wrap; overflow-wrap: anywhere;">';
-	$body .= htmlspecialchars($xml, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-	$body .= '</pre>';
+	$body .= '<pre class="xmlsource">'.einvoicingXmlSourceToHtml($xml).'</pre>';
+	$body .= einvoicingXmlSourceCss(1, function_exists('getNonce') ? getNonce() : '');
 }
 
 if ($mode == 'raw') {
@@ -174,8 +176,8 @@ if ($mode == 'raw') {
 	top_httphead('text/html');
 	print '<!DOCTYPE html>'."\n".'<html><head><meta charset="UTF-8">';
 	print '<title>'.dol_escape_htmltag($title).'</title>';
-	print '<style>body { margin: 0; padding: 8px; font-family: monospace; font-size: 12px; }';
-	print ' pre { margin: 0; } .opacitymedium { opacity: 0.6; padding-bottom: 8px; }</style>';
+	print '<style>body { margin: 0; padding: 8px; font-family: monospace; font-size: 12px; background: #fff; }';
+	print ' .opacitymedium { opacity: 0.6; padding-bottom: 8px; }</style>';
 	print '</head><body>'.$body.'</body></html>';
 } else {
 	llxHeader('', $title, '', '', 0, 0, '', '', '', 'mod-einvoicing page-xmlpreview');
