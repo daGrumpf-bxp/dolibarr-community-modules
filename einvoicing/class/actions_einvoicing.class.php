@@ -525,6 +525,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs, $user;
 
+		// Before anything else, and before the early return below: a list of the core builds its
+		// $arrayfields before it knows any action, and the versions that offer no 'completeArrayFields'
+		// hook pass the array by reference here instead. See addFieldsToList().
+		if (isset($parameters['arrayfields'])) {
+			self::addFieldsToList($parameters['arrayfields'], $parameters['context']);
+		}
+
 		if (empty($action)) {
 			return 0;
 		}
@@ -1245,16 +1252,42 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function completeArrayFields($parameters, $object, &$action, $hookmanager)
 	{
-		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (isset($parameters['arrayfields'])) {
+			self::addFieldsToList($parameters['arrayfields'], $parameters['context']);
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Declare the columns of the module in the list of fields a list of the core offers to display.
+	 *
+	 * Called from two hooks on purpose. 'completeArrayFields' is the hook meant for this, but the core
+	 * only executes it from Dolibarr 22 on the customer invoice list and 23 on the supplier invoice and
+	 * thirdparty lists; 'doActions', on the other hand, receives the same array by reference from
+	 * Dolibarr 18 on the customer invoice list, 19 on the supplier invoice list and 20 on the thirdparty
+	 * list. Declaring from both is what makes the columns reachable on the versions still supported -
+	 * without it the checkboxes of the module simply do not exist on those cores, so its columns can
+	 * never be displayed. Writing the same keys twice, where both hooks run, changes nothing.
+	 *
+	 * @param 	array<string,mixed>	$arrayfields	Fields of the list, as the core passes them by reference
+	 * @param 	string				$context		Value of $parameters['context'] as the hook manager builds it
+	 * @return 	void
+	 */
+	protected static function addFieldsToList(&$arrayfields, $context)
+	{
+		$contexts = explode(':', $context);
+
+		if (in_array('invoicelist', $contexts, true) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			// Add fields to invoice list
-			$parameters['arrayfields']['einvoicegenerated'] = array(
+			$arrayfields['einvoicegenerated'] = array(
 				'label' => 'EInvoiceFile',
 				'checked' => -1,
 				'position' => 900,
 				'enabled' => 1,
 				'perms' => '1'
 			);
-			$parameters['arrayfields']['pdp_syncstatus'] = array(
+			$arrayfields['pdp_syncstatus'] = array(
 				'label' => 'PDPSyncStatus',
 				'checked' => 1,
 				'position' => 901,
@@ -1263,9 +1296,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 		}
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			// Add fields to invoice list
-			$parameters['arrayfields']['routing_id'] = array(
+		if (in_array('thirdpartylist', $contexts, true) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
+			// Add fields to thirdparty list
+			$arrayfields['routing_id'] = array(
 				'label' => 'RoutingIdField',
 				'help' => 'SpecificRoutingFieldHelp',
 				'checked' => -1,
@@ -1273,7 +1306,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				'enabled' => 1,
 				'perms' => '1'
 			);
-			$parameters['arrayfields']['routing_product_id'] = array(
+			$arrayfields['routing_product_id'] = array(
 				'label' => 'DefaultProductEBilling',
 				'checked' => -1,
 				'position' => 901,
@@ -1281,8 +1314,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				'perms' => '1'
 			);
 		}
-
-		return 0;
 	}
 
 
@@ -1574,7 +1605,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+			// 'routing_id' is the field addFieldsToList() declares for that list; 'einvoicegenerated' is the
+			// one of the invoice list, so the column of the thirdparty list never followed its own checkbox
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				print '<td class="liste_titre">';
 				print '<input type="text" name="search_routing_id" value="' . dolPrintHTMLForAttribute(GETPOST('search_routing_id', 'alpha')) . '" class="minwidth50 maxwidth100">';
 				print '</td>';
@@ -1633,7 +1666,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		if (in_array('thirdpartylist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingThirdPartyRoutingTitle'));
 			}
 		}
@@ -1744,7 +1777,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context']), true)) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				$obj = $parameters['obj'];
 
 				print '<td class="tdoverflowmax125">';
