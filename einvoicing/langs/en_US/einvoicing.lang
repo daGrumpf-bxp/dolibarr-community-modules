@@ -636,3 +636,10 @@ LastSynchronizationDate=Last Synchronization Date
 CustomerInvoicesSynchronized=Customer Invoices Synchronized
 SupplierInvoicesSynchronized=Supplier Invoices Synchronized
 define=Define
+
+# E-invoice XML preview (xmlpreview.php)
+EInvoiceXmlPreviewTitle=E-invoice XML
+EInvoicePreviewXml=Show the e-invoice XML
+EInvoiceNoFileToPreview=No e-invoice XML has been generated for this invoice.
+EInvoiceNoReceivedFileToPreview=No e-invoice XML has been received for this invoice.
+EInvoiceXmlReindented=received on a single line, shown reindented
