@@ -1,4 +1,5 @@
 <?php
+// dry run, not for merge (2)
 /* Copyright (C) 2026       solauv
  *
  * This program is free software: you can redistribute it and/or modify
@@ -482,3 +483,4 @@ class PriceHelper
 		return $result;
 	}
 }
+
