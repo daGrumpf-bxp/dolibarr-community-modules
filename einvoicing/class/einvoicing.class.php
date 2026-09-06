@@ -107,6 +107,12 @@ class EInvoicing
 		self::STATUS_IGNORE_2
 	];
 
+	/**
+	 * Processing rule under which a platform files a flow as B2B international: the lifecycle then
+	 * belongs to e-reporting and the platform refuses every status but the payment event (issue #799).
+	 */
+	const PROCESSING_RULE_INTERNATIONAL = 'B2BInt';
+
 	// PDP / PA normalized statuses
 	// public const STATUS_DEPOSITED           = 200;
 	// public const STATUS_ISSUED              = 201;
@@ -950,6 +956,54 @@ class EInvoicing
 	}
 
 	/**
+	 * Processing rule the platform computed for the flow that brought an invoice in ('B2B', 'B2BInt',
+	 * 'NotApplicable', ...). Read from the invoice flow, never from its lifecycle flows; a row synchronized
+	 * before the column existed falls back on the raw metadata kept in debug mode.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('invoice_supplier')
+	 * @return	string					The rule, empty when unknown
+	 */
+	public function getFlowProcessingRule($elementId, $elementType)
+	{
+		$sql = "SELECT processing_rule, response_for_debug FROM " . $this->db->prefix() . "einvoicing_document";
+		$sql .= " WHERE fk_element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND fk_element_id = " . (int) $elementId;
+		$sql .= " AND COALESCE(flow_syntax, '') <> 'CDAR'";
+		$sql .= " ORDER BY rowid DESC";
+		$sql .= $this->db->plimit(1);
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return '';
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+		if (!$obj) {
+			return '';
+		}
+		if (!empty($obj->processing_rule)) {
+			return (string) $obj->processing_rule;
+		}
+		$metadata = empty($obj->response_for_debug) ? null : json_decode($obj->response_for_debug, true);
+
+		return (is_array($metadata) && !empty($metadata['processingRule'])) ? (string) $metadata['processingRule'] : '';
+	}
+
+	/**
+	 * Whether the platform filed the invoice under B2B international (see PROCESSING_RULE_INTERNATIONAL).
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('invoice_supplier')
+	 * @return	bool					True when no lifecycle status will be accepted on it
+	 */
+	public function isInternationalFlow($elementId, $elementType)
+	{
+		return $this->getFlowProcessingRule($elementId, $elementType) === self::PROCESSING_RULE_INTERNATIONAL;
+	}
+
+	/**
 	 * Statuses a user may still send by hand on an invoice received through the platform.
 	 *
 	 * A status already accepted is not proposed again, "Refused" (210) ends the exchange, and "Payment
@@ -965,6 +1019,10 @@ class EInvoicing
 	public function getSendableStatusesForReceivedInvoice($elementId, $elementType)
 	{
 		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_REFUSED, 1)) {
+			return array();
+		}
+		// Filed as B2B international by the platform: no lifecycle answer will be accepted (issue #799).
+		if ($this->isInternationalFlow($elementId, $elementType)) {
 			return array();
 		}
 

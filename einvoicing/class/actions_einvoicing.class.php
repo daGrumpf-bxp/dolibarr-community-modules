@@ -455,6 +455,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// after the approval (issue #548).
 				$availableStatuses = $einvoicing->getSendableStatusesForReceivedInvoice($object->id, $object->element);
 
+				// Nothing is offered on a flow the platform filed as B2B international: say why, rather
+				// than letting its HTTP 400 do it on the first click (issue #799).
+				$processingRule = $einvoicing->getFlowProcessingRule($object->id, $object->element);
+				if ($processingRule === EInvoicing::PROCESSING_RULE_INTERNATIONAL) {
+					print '<div class="info">' . $langs->trans('EInvoiceFlowInternationalNoLifecycle', $processingRule) . '</div>';
+				}
+
 				// A button that quietly disappears looks like a bug. Say why the credit note of a refused
 				// invoice cannot be accepted, and name the invoice it credits (issue #594).
 				dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
@@ -758,6 +765,19 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 				$pdpstatuscode = GETPOSTINT('pdpstatuscode') ?: 0;
 				$statusRaison = GETPOST('statusRaison', 'alpha');
+
+				// The card offers no status on a flow filed as B2B international; a status posted anyway
+				// would only collect the platform's refusal (issue #799).
+				$processingRule = $einvoicing->getFlowProcessingRule((int) $object->id, $object->element);
+				if ($processingRule === EInvoicing::PROCESSING_RULE_INTERNATIONAL) {
+					$message = $langs->trans('EInvoiceFlowInternationalStatusRefused', $processingRule);
+					setEventMessages($message, array(), 'errors');
+					$this->errors[] = $message;
+
+					$db->commit();
+
+					return 0;
+				}
 
 				// If the status we try to set is Approved, check that the invoice we try to approve is not a credit note to correct a supplier invoice that were already refused.
 				// If parent invoice was refused, we must block the Approval because we need to refuse the credit note also.
