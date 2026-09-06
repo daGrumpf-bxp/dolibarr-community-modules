@@ -183,17 +183,22 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	 * the transaction opened by CommonClassTest::setUpBeforeClass(), so nothing survives the run.
 	 *
 	 * @param	int		$supplierInvoiceId	Id of the supplier invoice the document describes
+	 * @param	string	$processingRule		Rule the platform computed for the flow ('B2B', 'B2BInt', ...), if any
+	 * @param	string	$responseForDebug	Raw flow metadata, as kept by the synchronization in debug mode
 	 * @return	void
 	 */
-	private function addEInvoicingDocument($supplierInvoiceId)
+	private function addEInvoicingDocument($supplierInvoiceId, $processingRule = '', $responseForDebug = '')
 	{
 		global $db;
 
 		$now = $db->idate(dol_now());
 
 		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "einvoicing_document";
-		$sql .= " (fk_element_type, fk_element_id, flow_type, date_creation, fk_user_creat, status, submittedat, provider)";
-		$sql .= " VALUES ('invoice_supplier', " . ((int) $supplierInvoiceId) . ", 'SupplierInvoice', '" . $now . "', 1, 0, '" . $now . "', 'PHPUNIT')";
+		$sql .= " (fk_element_type, fk_element_id, flow_type, flow_syntax, processing_rule, response_for_debug, date_creation, fk_user_creat, status, submittedat, provider)";
+		$sql .= " VALUES ('invoice_supplier', " . ((int) $supplierInvoiceId) . ", 'SupplierInvoice', 'UBL'";
+		$sql .= ", " . ($processingRule === '' ? "NULL" : "'" . $db->escape($processingRule) . "'");
+		$sql .= ", " . ($responseForDebug === '' ? "NULL" : "'" . $db->escape($responseForDebug) . "'");
+		$sql .= ", '" . $now . "', 1, 0, '" . $now . "', 'PHPUNIT')";
 
 		$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
 	}
@@ -712,6 +717,70 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 
 		$einvoicing = new EInvoicing($db);
 		$this->assertTrue(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * A flow the platform filed as B2B international gets no lifecycle answer: it refuses every status but
+	 * the payment event, so nothing is sent on validation and nothing is offered by hand (issue #799).
+	 *
+	 * @return void
+	 */
+	public function testInternationalFlowGetsNoLifecycleAnswer()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id, EInvoicing::PROCESSING_RULE_INTERNATIONAL);
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertSame('B2BInt', $einvoicing->getFlowProcessingRule((int) $invoice->id, 'invoice_supplier'));
+		$this->assertTrue($einvoicing->isInternationalFlow((int) $invoice->id, 'invoice_supplier'));
+		$this->assertFalse(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+		$this->assertSame(array(), $einvoicing->getSendableStatusesForReceivedInvoice((int) $invoice->id, 'invoice_supplier'));
+	}
+
+	/**
+	 * A domestic flow keeps its lifecycle: "Approved" is sent on validation, and both answers are
+	 * offered by hand. The rule is the only thing that differs from the test above.
+	 *
+	 * @return void
+	 */
+	public function testDomesticFlowKeepsItsLifecycleAnswer()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_SEND_APPROVED_ON_VALIDATION = '1';
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id, 'B2B');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse($einvoicing->isInternationalFlow((int) $invoice->id, 'invoice_supplier'));
+		$this->assertTrue(SupplierInvoiceHelper::shouldSendApprovedOnValidation($einvoicing, (int) $invoice->id, 'invoice_supplier'));
+		$statuses = $einvoicing->getSendableStatusesForReceivedInvoice((int) $invoice->id, 'invoice_supplier');
+		$this->assertArrayHasKey(EInvoicing::STATUS_APPROVED, $statuses);
+		$this->assertArrayHasKey(EInvoicing::STATUS_REFUSED, $statuses);
+	}
+
+	/**
+	 * A flow synchronized before the column existed still carries the rule in the raw metadata kept in
+	 * debug mode: it is read from there, so an instance in the middle of the case is covered without a
+	 * new synchronization.
+	 *
+	 * @return void
+	 */
+	public function testProcessingRuleFallsBackOnDebugMetadata()
+	{
+		global $db;
+
+		$invoice = $this->createSpecimenSupplierInvoice();
+		$this->addEInvoicingDocument($invoice->id, '', '{"processingRule":"B2BInt","flowId":"i_1","processingRuleSource":"Computed"}');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertTrue($einvoicing->isInternationalFlow((int) $invoice->id, 'invoice_supplier'));
+		$this->assertSame(array(), $einvoicing->getSendableStatusesForReceivedInvoice((int) $invoice->id, 'invoice_supplier'));
 	}
 
 	/**

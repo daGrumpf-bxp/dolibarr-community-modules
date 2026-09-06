@@ -586,7 +586,8 @@ class SupplierInvoiceHelper
 	 *   - EINVOICING_SEND_APPROVED_ON_VALIDATION, for an instance where validating an invoice
 	 *     mean approving it. The status stays available by hand from the invoice card.
 	 *   - the answer is no with EINVOICING_DISABLE_SYNC_DOLI_TO_AP set, on an invoice that never came from
-	 *     the platform, when a 205 or a 210 was already sent, or on a credit note of a refused one (#594).
+	 *     the platform, when a 205 or a 210 was already sent, on a credit note of a refused one (#594), or
+	 *     on a flow the platform filed as B2B international, where it refuses every status (#799).
 	 *
 	 * @param	EInvoicing	$einvoicing		Module object, for the lifecycle message lookup
 	 * @param	int			$supplierInvoiceId	Id of the supplier invoice being validated
@@ -611,6 +612,9 @@ class SupplierInvoiceHelper
 			return false;
 		}
 		if (self::refusedSourceOfCreditNote($supplierInvoiceId) > 0) {
+			return false;
+		}
+		if ($einvoicing->isInternationalFlow($supplierInvoiceId, $elementType)) {
 			return false;
 		}
 
@@ -776,6 +780,11 @@ class SupplierInvoiceHelper
 	{
 		global $db;
 
+		// $ref and $context carry values read from the received e-invoice (document number, line id).
+		// The caller prints this message as HTML in the synchronization panel, so neutralize any markup.
+		$ref = dol_escape_htmltag((string) $ref);
+		$context = dol_escape_htmltag($context);
+
 		if ($code == -2) {
 			return 'Several supplier invoices match reference "' . $ref . '" ' . $context . ', cannot determine which one to use';
 		}
@@ -783,7 +792,7 @@ class SupplierInvoiceHelper
 			return 'Found a supplier invoice matching "' . $ref . '" for the thirdparty (but with non matching expected amount) ' . $context . ', cannot determine which one to use';
 		}
 
-		return 'Database error while looking for a supplier invoice with reference "' . $ref . '" ' . $context . ': ' . $db->lasterror();
+		return 'Database error while looking for a supplier invoice with reference "' . $ref . '" ' . $context . ': ' . dol_escape_htmltag($db->lasterror());
 	}
 
 	/**

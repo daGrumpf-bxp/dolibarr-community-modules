@@ -788,7 +788,7 @@ trait CommonProtocol
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)), LOG_ERR);
 				return array(
 					'res' => -1,
-					'message' => 'Thirdparty update error: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)).'.'
+					'message' => 'Thirdparty update error: ' . dol_escape_htmltag(implode(',', array_merge(array($thirdparty->error), $thirdparty->errors))).'.'
 				);
 			} else {
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updated thirdparty: ' . $thirdpartyId);
@@ -852,7 +852,7 @@ trait CommonProtocol
 				return array('res' => $thirdpartyId, 'message' => 'Thirdparty ' . $thirdparty->name . ' created successfully');
 			} else {
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error creating thirdparty: ' . $thirdparty->error, LOG_ERR);
-				return array('res' => -1, 'message' => 'Thirdparty creation error: ' . implode("\n", $thirdparty->errors));
+				return array('res' => -1, 'message' => 'Thirdparty creation error: ' . dol_escape_htmltag(implode("\n", $thirdparty->errors)));
 			}
 		} else {
 			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Auto-creation of thirdparties is disabled', LOG_ERR);
@@ -1147,7 +1147,7 @@ trait CommonProtocol
 			$resCheck = $product->check();
 			if ($resCheck < 0) {
 				dol_syslog(__METHOD__ . ' Product check failed: ' . $product->error, LOG_ERR);
-				return array('res' => -1, 'message' => 'Product check failed: ' . implode("\n", $product->errors));
+				return array('res' => -1, 'message' => 'Product check failed: ' . dol_escape_htmltag(implode("\n", $product->errors)));
 			}
 
 			// Create product
@@ -1174,7 +1174,7 @@ trait CommonProtocol
 			dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
 			return [
 				'res' => -1,
-				'message' => 'Product creation error: ' . $product->error,
+				'message' => 'Product creation error: ' . dol_escape_htmltag($product->error),
 			];
 		} else {
 			// Suggest manual creation of product

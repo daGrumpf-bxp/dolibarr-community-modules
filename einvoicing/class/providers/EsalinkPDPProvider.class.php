@@ -197,7 +197,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
 
 				if (!empty($tokenData['token_expires_at'])) {
-					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
+					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("Until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
 				}
 				//var_dump($tokenData);
 			}
@@ -417,7 +417,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			return array('res' => -1, 'message' => $langs->trans('NoAvailableValidatorforThisAccessPoint'));
 		}
 
-		return array('res' => 0, 'message' => $langs->trans('skipped'));
+		return array('res' => 0, 'message' => $langs->trans('Skipped'));
 	}
 
 	/**
@@ -1033,7 +1033,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						);
 
 						dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
-						$results_messages[] = "Flow " . $flow['flowId'] . " postponed, it will be retried on the next synchronization: " . $res['message'];
+						$results_messages[] = "Flow " . dol_escape_htmltag((string) $flow['flowId']) . " postponed, it will be retried on the next synchronization: " . $res['message'];
 
 						$postponedFlows++;
 						continue;
@@ -1102,14 +1102,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						}
 					}
 					dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_einvoicing");
-					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . $res['message'];
 
 					$error++;
 				}
 
 				// If res == 0, commit but count it as already existed
 				if ($res['res'] == 0) {
-					$results_messages[] = "<span class=\"opacitylow\">Flow " . $flow['flowId'] . " skipped: " . $res['message'] . "</span>";
+					$results_messages[] = "<span class=\"opacitylow\">Flow " . dol_escape_htmltag((string) $flow['flowId']) . " skipped: " . $res['message'] . "</span>";
 					$alreadyExist++;
 					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 				}
@@ -1120,7 +1120,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 				}
 			} catch (Exception $e) {
-				$results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
+				$results_messages[] = "Exception occurred while synchronizing flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . dol_escape_htmltag($e->getMessage());
 				$error++;
 			}
 
@@ -1266,6 +1266,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$document->flow_direction       = $flowData['flowDirection'] ?? null;
 		$document->flow_syntax          = $flowData['flowSyntax'] ?? null;
 		$document->flow_profile         = $flowData['flowProfile'] ?? null;
+		$document->processing_rule      = $flowData['processingRule'] ?? null;
 		$document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
 		// Change this fields to fit with the new api response ===============================================
 		$document->ack_reason_code      = $flowData['acknowledgement']['details'][0]['reasonCode'] ?? null;

@@ -42,7 +42,7 @@ function einvoicingAdminPrepareHead()
 	// $extrafields = new ExtraFields($db);
 	// $extrafields->fetch_name_optionals_label('myobject');
 
-	$langs->load("einvoicing@einvoicing");
+	$langs->loadLangs(array("accountancy", "einvoicing@einvoicing"));
 
 	$h = 0;
 	$head = array();
@@ -339,11 +339,20 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 			$module = 'knowledgemanagement';
 			$subdirectory = '/knowledgerecord';
 			break;
+		case 'partnership':
+			$subdirectory = '/partnership';
+			break;
+		case 'stocktransfer':
+			$subdirectory = '/stocktransfer';
+			break;
 		case 'commande_fournisseur':
 			$module = 'fournisseur';
 			$subdirectory = '/commande';
 			break;
 		case 'expedition':
+		case 'shipment':
+		case 'shipping':
+			$module = 'expedition';
 			$subdirectory = '/sending';
 			break;
 		case 'company':
@@ -352,6 +361,24 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 		case 'service':
 		case 'produit':
 			$module = 'product';
+			break;
+		case 'project_task':
+			$module = 'projet';
+
+			// Fetch the project to build the correct path. The signature of this function accepts an object
+			// that is not a CommonObject, and even a null when a module is given, so we must not call a method
+			// that only a CommonObject owns without testing it exists.
+			if (is_object($object) && method_exists($object, 'fetchProject')) {
+				$object->fetchProject();
+			}
+
+			// The ref must be sanitized with dol_sanitizeFileName() and not only with dol_sanitizePathName()
+			// done at the end of this function, because a project ref is a user input that may contain a '/',
+			// a ':' or an accented char. dol_sanitizePathName() keeps them, so we would not return the
+			// directory used by projet/tasks/document.php, that sanitizes the ref with dol_sanitizeFileName().
+			if (!empty($object->project->ref)) {
+				$subdirectory = '/'.dol_sanitizeFileName($object->project->ref);
+			}
 			break;
 		case 'action':
 		case 'actioncomm':
@@ -367,12 +394,18 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 		if (isset($conf->$module) && property_exists($conf->$module, 'multidir_output')) {
 			$s = '';
 			if ($mode != 'outputrel') {
-				$s = $conf->$module->multidir_output[(empty($object->entity) ? $conf->entity : $object->entity)] . $subdirectory;
+				// An entity with no directory declared used to return an undefined index, so a relative path
+				// that made the caller read or write under the web root. Answer the error instead.
+				$entity = (int) (empty($object->entity) ? $conf->entity : $object->entity);
+				if (!isset($conf->$module->multidir_output[$entity])) {
+					return 'error-diroutput-not-defined-for-this-object='.$module;
+				}
+				$s = $conf->$module->multidir_output[$entity].$subdirectory;
 			}
 			if ($forobject && $object->id > 0) {
 				$s .= ($mode != 'outputrel' ? '/' : '') . get_exdir(0, 0, 0, 0, $object);
 			}
-			return $s;
+			return dol_sanitizePathName($s);
 		} elseif (isset($conf->$module) && property_exists($conf->$module, 'dir_output')) {
 			$s = '';
 			if ($mode != 'outputrel') {
@@ -381,15 +414,20 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 			if ($forobject && $object->id > 0) {
 				$s .= ($mode != 'outputrel' ? '/' : '') . get_exdir(0, 0, 0, 0, $object);
 			}
-			return $s;
+			return dol_sanitizePathName($s);
 		} else {
 			return 'error-diroutput-not-defined-for-this-object=' . $module;
 		}
 	} elseif ($mode == 'temp') {
 		if (isset($conf->$module) && property_exists($conf->$module, 'multidir_temp')) {
-			return $conf->$module->multidir_temp[(empty($object->entity) ? $conf->entity : $object->entity)];
+			// Same guard as the 'output' mode above, see the comment there
+			$entity = (int) (empty($object->entity) ? $conf->entity : $object->entity);
+			if (!isset($conf->$module->multidir_temp[$entity])) {
+				return 'error-dirtemp-not-defined-for-this-object='.$module;
+			}
+			return dol_sanitizePathName($conf->$module->multidir_temp[$entity]);
 		} elseif (isset($conf->$module) && property_exists($conf->$module, 'dir_temp')) {
-			return $conf->$module->dir_temp;
+			return dol_sanitizePathName($conf->$module->dir_temp);
 		} else {
 			return 'error-dirtemp-not-defined-for-this-object=' . $module;
 		}
@@ -457,9 +495,10 @@ if (!method_exists('Societe', 'findNearest')) {
 	 *    @param    string	$ref_alias 		Name_alias of third party (Warning, this can return several records)
 	 * 	  @param	int		$is_client		Only client third party
 	 *    @param	int		$is_supplier	Only supplier third party
+	 *    @param	string	$vatnumber		VAT number
 	 *    @return   int						ID of thirdparty found if OK, <0 if KO (-2 if two records found or other negative if error), 0 if not found.
 	 */
-	function findNearest($rowid = 0, $ref = '', $ref_ext = '', $barcode = '', $idprof1 = '', $idprof2 = '', $idprof3 = '', $idprof4 = '', $idprof5 = '', $idprof6 = '', $email = '', $ref_alias = '', $is_client = 0, $is_supplier = 0)
+	function findNearest($rowid = 0, $ref = '', $ref_ext = '', $barcode = '', $idprof1 = '', $idprof2 = '', $idprof3 = '', $idprof4 = '', $idprof5 = '', $idprof6 = '', $email = '', $ref_alias = '', $is_client = 0, $is_supplier = 0, $vatnumber = '')
 	{
 		global $db;
 
@@ -539,6 +578,12 @@ if (!method_exists('Societe', 'findNearest')) {
 				$sqlprof .= " OR";
 			}
 			$sqlprof .= " s.idprof6 = '".$db->escape($idprof6)."'";
+		}
+		if ($vatnumber) {
+			if ($sqlprof) {
+				$sqlprof .= " OR";
+			}
+			$sqlprof .= " s.tva_intra = '".$db->escape($vatnumber)."'";
 		}
 
 		if ($sqlprof) {
