@@ -799,12 +799,7 @@ class EInvoicing
 			return $path;
 		}
 
-		// Documents received on Dolibarr 18 or 19 before issue #701 was fixed are in another directory,
-		// the one get_exdir() answers there when it is called without a level. They are not listed by the
-		// card, which reads the first path, but they are on disk and there is no reason not to show them.
-		$legacy = $base . get_exdir(0, 0, 0, 0, $supplierInvoice) . $ref . '/' . $filename;
-
-		return is_readable($legacy) ? $legacy : '';
+		return '';
 	}
 
 	/**
