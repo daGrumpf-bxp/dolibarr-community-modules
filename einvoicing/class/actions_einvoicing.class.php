@@ -1896,12 +1896,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			// Einvoice generated or not
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
-				print_liste_field_titre($langs->transnoentitiesnoconv('EInvoiceFile'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
+				print_liste_field_titre($langs->transnoentitiesnoconv('EInvoiceFile'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sortorder'] ?? '', 'center ');
 			}
 
 			// syncstatus
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
-				print_liste_field_titre($langs->transnoentitiesnoconv('PDPSyncStatus'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sotorder'] ?? '', 'center ');
+				print_liste_field_titre($langs->transnoentitiesnoconv('PDPSyncStatus'), '', '', '', $parameters['param'] ?? '', '', $parameters['sortfield'] ?? '', $parameters['sortorder'] ?? '', 'center ');
 			}
 		}
 
