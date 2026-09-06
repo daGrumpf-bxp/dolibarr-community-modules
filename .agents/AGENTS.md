@@ -164,11 +164,25 @@ Before any modification, verify:
 - User rights enforcement (`$user->hasRights("module", "permission")` or `$user->hasRights("module", "objectname", "permission")`)
 - Multi-entity compatibility (add ` AND entity IN ('.getDolEntity("tablename").')` in SQL requests)
 
-If adding a unit test was explicitely requested:
+### If adding a unit test was explicitely requested
+
 - If making or modifying external module, add PHPUnit test files in `yourmoduledir/test/phpunit/`.
 - **One test file per source file under test**: a new case goes into the test file of the class or library file it exercises, as a new method. Create a file only when that source file has no test file yet, and split by direction (export / import) rather than by issue when a file grows past about a thousand lines. The CI reads what a test file loads with `dol_include_once()` and refuses a new file whose source already has one.
 - If you need to validate code change or if it is explicitely requested, you can check code and dev syntax rules by running the following command on modified files (it takes a long time):
 	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --analyze-twice --minimum-target-php-version 7.2 --exclude-directory-list=dev/tools,mymodule/test/,mymodule/vendor/ --output-mode=checkstyle filemodified1.php filemodified2.php ...`
+
+### Local Dolibarr Online test — Page Access
+
+You can find the URL of an online instance into file htdocs/conf/conf.php in parameter $dolibarr_main_url_root. 
+You can ignore and bypass the warning about HTTPS certificate. Ask the password if you need one without trying to get it from database.
+
+Dolibarr requires a CSRF token and a session cookie. To access any authenticated page:
+
+1. **GET the login page** (e.g. `index.php?mainmenu=home`) to obtain:
+   - The CSRF token: extract the `name="token" value="..."` field from the HTML.
+   - The session cookie: the `DOLSESSID_*` cookie set in the response headers.
+2. **POST the login form** to `index.php` with `token`, `username`, `password`, and `actionlogin=dologin`. Keep the cookie for subsequent requests.
+3. **Reuse the session cookie** on all subsequent page requests — the session is now authenticated.
 
 ---
 
