@@ -41,7 +41,7 @@ External module structure:
 ├── `test/`
 └── `tpl/`
 
-Do not explore other directories than the workdir (that contains external modules) and the directory of Dolibarr project (that is in is ~/git/dolibarr or ~/git/dolibarr_dev). 
+Do not explore other directories than the workdir (that contains external modules) and the directory of Dolibarr project (that is in is ~/git/dolibarr). 
 A template of an external module directory content can be found in the `htdocs/modulebuilder/template` folder of the Dolibarr project.
 
 ---
