@@ -776,6 +776,11 @@ class SupplierInvoiceHelper
 	{
 		global $db;
 
+		// $ref and $context carry values read from the received e-invoice (document number, line id).
+		// The caller prints this message as HTML in the synchronization panel, so neutralize any markup.
+		$ref = dol_escape_htmltag((string) $ref);
+		$context = dol_escape_htmltag($context);
+
 		if ($code == -2) {
 			return 'Several supplier invoices match reference "' . $ref . '" ' . $context . ', cannot determine which one to use';
 		}
@@ -783,7 +788,7 @@ class SupplierInvoiceHelper
 			return 'Found a supplier invoice matching "' . $ref . '" for the thirdparty (but with non matching expected amount) ' . $context . ', cannot determine which one to use';
 		}
 
-		return 'Database error while looking for a supplier invoice with reference "' . $ref . '" ' . $context . ': ' . $db->lasterror();
+		return 'Database error while looking for a supplier invoice with reference "' . $ref . '" ' . $context . ': ' . dol_escape_htmltag($db->lasterror());
 	}
 
 	/**

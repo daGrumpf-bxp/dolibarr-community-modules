@@ -1975,7 +1975,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 							);
 
 							dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
-							$results_messages[] = "Flow " . $flow['flowId'] . " postponed, it will be retried on the next synchronization: " . $res['message'];
+							$results_messages[] = "Flow " . dol_escape_htmltag((string) $flow['flowId']) . " postponed, it will be retried on the next synchronization: " . $res['message'];
 
 							$postponedFlows++;
 							continue;
@@ -2044,14 +2044,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 							}
 						}
 						dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_einvoicing");
-						$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+						$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . $res['message'];
 
 						$error++;
 					}
 
 					// If res == 0, commit but count it as already existed
 					if ($res['res'] == 0) {
-						$results_messages[] = "<span class=\"opacitylow\">Flow " . $flow['flowId'] . " skipped: " . $res['message'] . "</span>";
+						$results_messages[] = "<span class=\"opacitylow\">Flow " . dol_escape_htmltag((string) $flow['flowId']) . " skipped: " . $res['message'] . "</span>";
 						$alreadyExist++;
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					}
@@ -2062,7 +2062,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					}
 				} catch (Exception $e) {
-					$results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
+					$results_messages[] = "Exception occurred while synchronizing flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . dol_escape_htmltag($e->getMessage());
 					$error++;
 				}
 

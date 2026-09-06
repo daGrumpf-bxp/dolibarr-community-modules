@@ -887,7 +887,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		if ($supplierInvoiceId > 0) {
-			$return_messages[] = 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists';
+			$return_messages[] = 'Supplier Invoice with reference ' . dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')) . ' already exists';
 
 			$supplierInvoice = new FactureFournisseur($db);
 			$supplierInvoice->fetch($supplierInvoiceId);
@@ -948,7 +948,7 @@ class CIIProtocol extends AbstractProtocol
 					return [
 						'res' => -1,
 						'postponeflow' => 1,
-						'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', was not found in Dolibarr',
+						'message' => 'Document ' . dol_escape_htmltag((string) $refDoc) . ', required by received document ' . dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')) . ', was not found in Dolibarr',
 						'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
 						'actionurl' => 'none',
 						'actiondata' => array('supplierref' => $refDoc, 'linkedref' => ($parsedHeader['documentno'] ?? ''), 'socid' => (int) $socId),
@@ -966,7 +966,7 @@ class CIIProtocol extends AbstractProtocol
 		// Set basic invoice information (type, date)
 		$supplierInvoice->type = $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
 		if ($supplierInvoice->type === '-1') {
-			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
+			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . dol_escape_htmltag((string) ($parsedHeader['documenttypecode'] ?? 'NA'))];
 		}
 		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
 		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
@@ -1071,7 +1071,7 @@ class CIIProtocol extends AbstractProtocol
 						return ['res' => -1, 'message' => SupplierInvoiceHelper::refLookupErrorMessage($linkedObjectId, $refDoc, 'required by received document ' . ($parsedHeader['documentno'] ?? ''))];
 					}
 					if ($linkedObjectId == 0) {
-						return ['res' => -1, 'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', was not found in Dolibarr'];
+						return ['res' => -1, 'message' => 'Document ' . dol_escape_htmltag((string) $refDoc) . ', required by received document ' . dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')) . ', was not found in Dolibarr'];
 					}
 
 					// Fetch Object
@@ -1110,7 +1110,7 @@ class CIIProtocol extends AbstractProtocol
 						// Reached only when fetch() failed on an id findIdByRef() did return, so the reference
 						// was matched and it is the loading that went wrong: saying "not found" here sent the
 						// reader looking for a missing invoice that is in fact there.
-						return ['res' => -1, 'message' => 'Document ' . $refDoc . ', required by received document ' . $parsedHeader['documentno'] . ', matches supplier invoice id ' . ((int) $linkedObjectId) . ' but that invoice could not be loaded'];
+						return ['res' => -1, 'message' => 'Document ' . dol_escape_htmltag((string) $refDoc) . ', required by received document ' . dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')) . ', matches supplier invoice id ' . ((int) $linkedObjectId) . ' but that invoice could not be loaded'];
 					}
 				}
 			}
@@ -1260,7 +1260,7 @@ class CIIProtocol extends AbstractProtocol
 					if ($linkedObjectId == 0) {
 						return [
 							'res' => -1,
-							'message' => 'Document "' . $lineRefDocId . '" linked to line ' . $parsedLine['lineid'] . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . $lineRefDocId . '".'
+							'message' => 'Document "' . dol_escape_htmltag((string) $lineRefDocId) . '" linked to line ' . dol_escape_htmltag((string) $parsedLine['lineid']) . ' was not found in Dolibarr. Please verify why this document is missing (deleted, not imported, or not provided by the supplier). To resolve this issue, you must manually create the invoice using the supplier invoice reference "' . dol_escape_htmltag((string) $lineRefDocId) . '".'
 						];
 						// TODO: Add a check before sending a final invoice after deposit to ensure that the deposit invoice has been properly sent to the PDP and successfully received.
 					}
@@ -1293,7 +1293,7 @@ class CIIProtocol extends AbstractProtocol
 						 * document types such as credit notes, etc.
 						 */
 					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $lineRefDocId . ' linked to line ' . $parsedLine['lineid'] . ' not found in Dolibarr'];
+						return ['res' => -1, 'message' => 'Document : ' . dol_escape_htmltag((string) $lineRefDocId) . ' linked to line ' . dol_escape_htmltag((string) $parsedLine['lineid']) . ' not found in Dolibarr'];
 					}
 				}
 			}
