@@ -47,8 +47,9 @@ env:
 jobs:
   # Which cores the suite runs on. What lands on main is run on all seven supported cores: the
   # version specific traps of this module live in the middle of the range. A pull request answers on
-  # the floor, the stable and the newest - and on the stable alone when it changes no code at all,
-  # since a translation or a document cannot behave differently from one core to the next.
+  # the two ends, the floor the module declares and the latest release - and on the latest alone
+  # when it changes no code at all, since a translation or a document cannot behave differently
+  # from one core to the next. The next major joins the matrix once a release ships its demo dump.
   cores:
     name: Cores to run on
     runs-on: ubuntu-latest
@@ -76,12 +77,11 @@ jobs:
                 {"dolibarr":"20.0.0","php":"8.2"},
                 {"dolibarr":"21.0.0","php":"8.3"},
                 {"dolibarr":"22.0.0","php":"8.3"},
-                {"dolibarr":"23.0.0","php":"8.3","validate":"yes"},
-                {"dolibarr":"24.0.0","php":"8.3"}]'
+                {"dolibarr":"23.0.0","php":"8.3"},
+                {"dolibarr":"24.0.0","php":"8.3","validate":"yes"}]'
           review='[{"dolibarr":"18.0.0","php":"8.2"},
-                   {"dolibarr":"23.0.0","php":"8.3","validate":"yes"},
-                   {"dolibarr":"24.0.0","php":"8.3"}]'
-          translations='[{"dolibarr":"23.0.0","php":"8.3","validate":"yes"}]'
+                   {"dolibarr":"24.0.0","php":"8.3","validate":"yes"}]'
+          translations='[{"dolibarr":"24.0.0","php":"8.3","validate":"yes"}]'
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             chosen="$all"
           elif [ "$ALL_KINDS" = "true" ]; then
@@ -200,7 +200,7 @@ jobs:
           mv "$fixture.orig" "$fixture"
           echo "EInvoicingSamplesTest refuses the damaged reference document, as it has to."
 
-      # The steps below run on one core of the matrix, the stable one. The suite above proves "what
+      # The steps below run on one core of the matrix, the latest release. The suite above proves "what
       # the module generates matches the reference documents" on every core, so a document that
       # differs by version cannot reach them unnoticed, and they need an instance that is already
       # standing here - which is why they are not a job of their own.
@@ -323,7 +323,7 @@ jobs:
         id: instance
         uses: ./.github/actions/dolibarr-instance
         with:
-          dolibarr: '23.0.0'
+          dolibarr: '24.0.0'
           php: '8.3'
 
       - name: Build the package with the release script
