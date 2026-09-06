@@ -586,7 +586,8 @@ class SupplierInvoiceHelper
 	 *   - EINVOICING_SEND_APPROVED_ON_VALIDATION, for an instance where validating an invoice
 	 *     mean approving it. The status stays available by hand from the invoice card.
 	 *   - the answer is no with EINVOICING_DISABLE_SYNC_DOLI_TO_AP set, on an invoice that never came from
-	 *     the platform, when a 205 or a 210 was already sent, or on a credit note of a refused one (#594).
+	 *     the platform, when a 205 or a 210 was already sent, on a credit note of a refused one (#594), or
+	 *     on a flow the platform filed as B2B international, where it refuses every status (#799).
 	 *
 	 * @param	EInvoicing	$einvoicing		Module object, for the lifecycle message lookup
 	 * @param	int			$supplierInvoiceId	Id of the supplier invoice being validated
@@ -611,6 +612,9 @@ class SupplierInvoiceHelper
 			return false;
 		}
 		if (self::refusedSourceOfCreditNote($supplierInvoiceId) > 0) {
+			return false;
+		}
+		if ($einvoicing->isInternationalFlow($supplierInvoiceId, $elementType)) {
 			return false;
 		}
 

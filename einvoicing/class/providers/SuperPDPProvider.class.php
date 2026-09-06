@@ -2252,6 +2252,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$document->flow_direction       = $flowData['flowDirection'] ?? null;
 		$document->flow_syntax          = $flowData['flowSyntax'] ?? null;
 		$document->flow_profile         = $flowData['flowProfile'] ?? null;
+		$document->processing_rule      = $flowData['processingRule'] ?? null;
 		$document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
 		// Change this fields to fit with the new api response ===============================================
 		$document->ack_reason_code      = $flowData['acknowledgement']['details'][0]['reasonCode'] ?? null;
