@@ -1,9 +1,14 @@
+---
+# Regenerate frequently the global index.yaml and rebuild the zip files.
 name: Update index.yaml After Merge
 
+
+# yamllint disable-line rule:truthy
 on:
-  pull_request:
-    types:
-      - closed
+  # Every time we want to refresh the baseline
+  schedule:
+    - cron: '0 5 * * 1'
+
 
 jobs:
   update-index:
@@ -26,7 +31,10 @@ jobs:
           php-version: '8.2'
 
       - name: Run Script to Generate index.yaml
-        run: php dev/build/makeindexyaml.php
+        run: php dev/build/makepack-modules.php index
+
+      - name: Run Script to Generate zip
+        run: php dev/build/makepack-modules.php makezip
 
       - name: Check for Changes
         id: check-changes
