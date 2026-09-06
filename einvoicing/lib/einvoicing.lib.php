@@ -42,7 +42,7 @@ function einvoicingAdminPrepareHead()
 	// $extrafields = new ExtraFields($db);
 	// $extrafields->fetch_name_optionals_label('myobject');
 
-	$langs->load("einvoicing@einvoicing");
+	$langs->loadLangs(array("accountancy", "einvoicing@einvoicing"));
 
 	$h = 0;
 	$head = array();
