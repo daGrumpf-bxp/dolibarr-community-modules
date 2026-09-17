@@ -23,6 +23,8 @@
  *                  and the two flags fetchLastknownInvoiceStatus() derives, 'transmitted' (from the
  *                  resettable syncstatus) and 'everTransmitted' (from the flow_id, which nothing clears).
  *                  Re-sending is refused as a duplicate, so only the second may gate a transmission.
+ *                  Also covers 'storedcode', the third derived value: the syncstatus as the table holds
+ *                  it, which a caller deciding what to persist must read instead of the corrected 'code'.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -197,5 +199,91 @@ class TransmittedLockTest extends CommonClassTest
 
 		$einvoicing = new EInvoicing($db);
 		$this->assertFalse($einvoicing->isTransmittedLockActive(self::TEST_ELEMENT_ID, 'TEST-LOCK-0001'));
+	}
+
+	/**
+	 * Put an e-invoice file where getEInvoiceFilePath() looks for it, and give back the way to remove it.
+	 *
+	 * @return 	string	Full path of the file written
+	 */
+	private function writeEInvoiceFile()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_PROTOCOL = 'CII';
+
+		// Plain filesystem calls: this test file loads the module class alone, not files.lib.php.
+		$dir = $conf->invoice->multidir_output[$conf->entity] . '/TEST-LOCK-0001';
+		if (!is_dir($dir)) {
+			mkdir($dir, 0755, true);
+		}
+		$path = $dir . '/TEST-LOCK-0001_cii.xml';
+		file_put_contents($path, '<test/>');
+
+		return $path;
+	}
+
+	/**
+	 * The bug of issue #998: 'code' is corrected from the file on disk, so a caller cannot tell from it
+	 * whether the table holds that status or not. Both protocols decided from 'code' whether to persist
+	 * GENERATED, right after writing the file - so the correction always answered "already generated",
+	 * the row stayed at "to generate" forever, and the invoice list showed it. 'storedcode' is the
+	 * uncorrected value they read now.
+	 *
+	 * @return void
+	 */
+	public function testStoredCodeIgnoresTheCorrectionMadeFromTheFileOnDisk()
+	{
+		global $db;
+
+		$path = $this->writeEInvoiceFile();
+
+		try {
+			$status = $this->statusFor('', EInvoicing::STATUS_NOT_GENERATED);
+
+			$this->assertSame('1', $status['file']);
+			$this->assertSame(EInvoicing::STATUS_GENERATED, $status['code'], 'the displayed status is corrected from the file on disk');
+			$this->assertSame(EInvoicing::STATUS_NOT_GENERATED, $status['storedcode'], 'the stored status is the one the table holds, uncorrected');
+		} finally {
+			unlink($path);
+		}
+	}
+
+	/**
+	 * Without a file on disk there is nothing to correct, and the two values agree.
+	 *
+	 * @return void
+	 */
+	public function testStoredCodeMatchesTheDisplayedCodeWithoutAFileOnDisk()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_PROTOCOL = 'CII';
+		$leftover = $conf->invoice->multidir_output[$conf->entity] . '/TEST-LOCK-0001/TEST-LOCK-0001_cii.xml';
+		if (file_exists($leftover)) {		// another test of the class writes it, whatever order the runner picks
+			unlink($leftover);
+		}
+
+		$status = $this->statusFor('', EInvoicing::STATUS_NOT_GENERATED);
+
+		$this->assertSame('0', $status['file']);
+		$this->assertSame(EInvoicing::STATUS_NOT_GENERATED, $status['code']);
+		$this->assertSame(EInvoicing::STATUS_NOT_GENERATED, $status['storedcode']);
+	}
+
+	/**
+	 * An element with no record at all answers UNKNOWN on both, so the caller creates the record.
+	 *
+	 * @return void
+	 */
+	public function testStoredCodeIsUnknownWhenNoRecordExists()
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$status = $einvoicing->fetchLastknownInvoiceStatus(self::TEST_ELEMENT_ID, 'TEST-LOCK-0001');
+
+		$this->assertSame(EInvoicing::STATUS_UNKNOWN, $status['code']);
+		$this->assertSame(EInvoicing::STATUS_UNKNOWN, $status['storedcode']);
 	}
 }
