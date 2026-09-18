@@ -1146,16 +1146,17 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
-	 * Build the return of processIncomingSupplierInvoiceStatus() for a reason this run could not read
-	 * the incoming status that may not be there anymore on the next one (a platform GET failure, an
-	 * empty response body). Nothing is stored, and 'postponeflow' tells syncFlows() to carry on with
-	 * the flows behind it instead of aborting the whole batch.
+	 * Build the return of processSupplierInvoiceStatusFromCdar() for a reason this run could not read
+	 * the status that may not be there anymore on the next one (a platform GET failure, an empty
+	 * response body). Nothing is stored, and 'postponeflow' tells syncFlows() to carry on with the
+	 * flows behind it instead of aborting the whole batch.
 	 *
-	 * @param	string	$flowId		Flow identifier of the lifecycle message
-	 * @param	string	$message	Technical detail for the synchronization log
+	 * @param	string	$flowId			Flow identifier of the lifecycle message
+	 * @param	string	$message		Technical detail for the synchronization log
+	 * @param	int		$issuedByUs		1 when the status went out from this access point account, 0 when the vendor issued it
 	 * @return	array{res:int, postponeflow:int, message:string, actioncode:string, actionurl:string, action:string, businessmessage:string}
 	 */
-	protected function postponeIncomingSupplierInvoiceStatus($flowId, $message)
+	protected function postponeSupplierInvoiceStatusFromCdar($flowId, $message, $issuedByUs = 0)
 	{
 		global $langs;
 
@@ -1165,16 +1166,25 @@ abstract class AbstractPDPProvider
 			'res' => -1,
 			'postponeflow' => 1,
 			'message' => $message,
-			'actioncode' => 'CANT_READ_INCOMING_LIFECYCLE_STATUS',
+			'actioncode' => $issuedByUs ? 'CANT_READ_OUTGOING_LIFECYCLE_STATUS' : 'CANT_READ_INCOMING_LIFECYCLE_STATUS',
 			'actionurl' => '',
+			// Same advice whichever way the status went, so the one key serves both
 			'action' => $langs->trans('CheckAccessPointCantReadIncomingStatus'),
-			'businessmessage' => $langs->trans('CantReadTheStatusSentByTheVendor', $flowId)
+			'businessmessage' => $langs->trans($issuedByUs ? 'CantReadTheStatusIssuedOutsideDolibarr' : 'CantReadTheStatusSentByTheVendor', $flowId)
 		);
 	}
 
 	/**
-	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
-	 * invoice it refers to.
+	 * Record a lifecycle status onto the supplier invoice its CDAR refers to, when nothing stored in
+	 * this Dolibarr says which invoice that status is about.
+	 *
+	 * Two flows land here, and the CDAR is the only thing naming the invoice in both:
+	 * - an INCOMING one, a status the VENDOR issued about one of its own invoices - "Cashed in" (212)
+	 *   above all, the answer to the payment we reported with a 211;
+	 * - an OUTGOING one this Dolibarr never sent, which therefore has no row in einvoicing_lifecycle_msg
+	 *   to be found by its flowId: a status issued from the access point's own web interface, or by
+	 *   another system sharing the same account (issue #1020). Storing such a flow without reading it
+	 *   loses the status for good, because the next run sees the flow as already known.
 	 *
 	 * A status this Dolibarr instance cannot attach to an invoice (refused, an unparseable CDAR, or an
 	 * access point account shared with another system) is not worth retrying: the flow is stored with
@@ -1192,7 +1202,7 @@ abstract class AbstractPDPProvider
 	 * @param	EInvoicing	$einvoicing		E-invoicing helper of the running synchronization
 	 * @return	array{res:int, message:string, postponeflow?:int, actioncode?:string, actionurl?:string, action?:string, businessmessage?:string}	1 attached, 0 resolved but stored without attaching, negative (with postponeflow) on a transient platform failure that must not be stored
 	 */
-	protected function processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing)
+	protected function processSupplierInvoiceStatusFromCdar($flowId, $document, $einvoicing)
 	{
 		global $db, $langs;
 
@@ -1208,6 +1218,10 @@ abstract class AbstractPDPProvider
 		// An exact link to try below, before it is overwritten with the CDAR's IssuerAssignedID.
 		$flowTrackingId = (string) $document->tracking_idref;
 
+		// Only decides the wording the synchronization panel shows: an outgoing status this Dolibarr
+		// never sent is not something its vendor can be asked about.
+		$issuedByUs = ($document->flow_direction === 'Out') ? 1 : 0;
+
 		$flowResponse = $this->fetchFlowData($flowId, 'Original');
 		if ($flowResponse['status_code'] != 200) {
 			// Some flows have no 'Original' on the access point, only the converted copy. Both carry
@@ -1215,12 +1229,12 @@ abstract class AbstractPDPProvider
 			$flowResponse = $this->fetchFlowData($flowId, 'Converted');
 		}
 		if ($flowResponse['status_code'] != 200) {
-			return $this->postponeIncomingSupplierInvoiceStatus($flowId, "Failed to retrieve flow details for flowId: " . $flowId);
+			return $this->postponeSupplierInvoiceStatusFromCdar($flowId, "Failed to retrieve flow details for flowId: " . $flowId, $issuedByUs);
 		}
 		if ($flowResponse['response'] === '') {
 			// A 200 with nothing to serve: the document is not materialized on the access point yet.
 			// Unlike a malformed body below, this can resolve on its own on a later run.
-			return $this->postponeIncomingSupplierInvoiceStatus($flowId, "FlowId " . $flowId . " - Empty flow document body");
+			return $this->postponeSupplierInvoiceStatusFromCdar($flowId, "FlowId " . $flowId . " - Empty flow document body", $issuedByUs);
 		}
 
 		$cdarHandler = new CdarHandler($db);
@@ -1265,7 +1279,7 @@ abstract class AbstractPDPProvider
 
 		if ($supplierInvoiceId <= 0 && $vendorReference === '') {
 			dol_syslog(__METHOD__ . " FlowId " . $flowId . " carries no IssuerAssignedID, nothing to attach the status to", LOG_WARNING);
-			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Vendor lifecycle status with no invoice reference");
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Lifecycle status with no invoice reference");
 		}
 
 		if ($supplierInvoiceId <= 0 && $vendorReference !== '') {
@@ -1297,7 +1311,7 @@ abstract class AbstractPDPProvider
 
 		$statusComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : $document->cdar_reason_desc;
 
-		// What the vendor reports in figures (MDG-43): the amount cashed in of a 212 above all, which is
+		// What the status reports in figures (MDG-43): the amount cashed in of a 212 above all, which is
 		// the only thing telling a cash-in from the refund of a credit note (both are a 212).
 		$amountsReported = empty($refDoc['StatusCharacteristics'])
 			? ''
@@ -1335,8 +1349,8 @@ abstract class AbstractPDPProvider
 
 		if ($resExtLink <= 0 || $resStatusMessage <= 0) {
 			$db->rollback();
-			dol_syslog(__METHOD__ . " FlowId " . $flowId . " - failed to record the vendor status: " . $db->lasterror(), LOG_ERR);
-			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Failed to record the vendor status on supplier invoice " . $supplierInvoice->ref);
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " - failed to record the status: " . $db->lasterror(), LOG_ERR);
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Failed to record the status on supplier invoice " . $supplierInvoice->ref);
 		}
 
 		$db->commit();
@@ -1345,7 +1359,7 @@ abstract class AbstractPDPProvider
 		$reasonDetail = $statusComment ? " - " . $statusComment : '';
 		$this->addEvent('STATUS', "EINVOICING - Status: " . $statusLabel, "EINVOICING - Status: " . $statusLabel . $reasonDetail, $supplierInvoice);
 
-		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref);
+		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref);
 	}
 
 	/**

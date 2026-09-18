@@ -2767,7 +2767,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// Supplier Invoice LC (life cycle)
 			case "SupplierInvoiceLC":
-				// This is a supplier invoice lifecycle message that we sent to PDP.
+				// This is a supplier invoice lifecycle message, usually one that we sent to PDP.
 				// We link it to the supplier invoice in dolibarr and we check validation response.
 				// Since we trigger an AJAX every X seconds to get validation response while validation of sent LC message remains in the "Pending" status after sending. That will be a double check of validation of sent LC message in case ajax call it not triggered or failed for some reason.
 
@@ -2778,7 +2778,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// (212) above all, the answer to the payment we reported with a 211. We never sent it, so it
 				// has no row in einvoicing_lifecycle_msg and the flowId lookup below cannot resolve it.
 				if ($document->flow_direction == 'In') {
-					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
+					$resIncoming = $this->processSupplierInvoiceStatusFromCdar($flowId, $document, $einvoicing);
 
 					// A negative result is a transient failure of the platform call only (a CDAR parsing
 					// failure is stored as res=0, it would not parse any better on retry): return without
@@ -2796,8 +2796,20 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// Fetch the linked supplier invoice using flowId stored in einvoicing_lifecycle_msg table when the LC message was sent
 				$resFetchStatusMessages = $einvoicing->fetchStatusMessages($flowId);
 				if (!is_array($resFetchStatusMessages) /* || $resFetchStatusMessages < 0 */ || empty($resFetchStatusMessages)) {
-					$returnRes = 0;
-					$returnMessage = "Failed to fetch status messages for flowId: " . $flowId;
+					// Not one of ours: an outgoing status this Dolibarr never sent has no row to be found
+					// here - it was issued from the access point's own web interface, or by another system
+					// sharing the same account (issue #1020). The CDAR still names the invoice it is about,
+					// so read it rather than store the flow blind: a stored flow is "already known" on the
+					// next run and never read again, which loses the status for good.
+					$resFromCdar = $this->processSupplierInvoiceStatusFromCdar($flowId, $document, $einvoicing);
+
+					if ($resFromCdar['res'] < 0) {
+						// Left unrecorded on purpose: a stored flow is treated as known and never retried.
+						return $resFromCdar;
+					}
+
+					$returnRes = $resFromCdar['res'];
+					$returnMessage = $resFromCdar['message'];
 				} else {
 					// Fetch ref and id to link the document to supplier invoice
 					$supplierInvoiceObj = new FactureFournisseur($this->db);
