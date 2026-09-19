@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CrossDomainAcknowledgementAndResponse xmlns="urn:un:unece:uncefact:data:standard:CrossDomainAcknowledgementAndResponse:100">
+    <ExchangedDocumentContext xmlns="urn:un:unece:uncefact:data:standard:CrossDomainAcknowledgementAndResponse:100">
+        <BusinessProcessSpecifiedDocumentContextParameter xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <ID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">REGULATED</ID>
+        </BusinessProcessSpecifiedDocumentContextParameter>
+        <GuidelineSpecifiedDocumentContextParameter xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <ID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">urn.cpro.gouv.fr:1p0:CDV:invoice</ID>
+        </GuidelineSpecifiedDocumentContextParameter>
+    </ExchangedDocumentContext>
+    <ExchangedDocument xmlns="urn:un:unece:uncefact:data:standard:CrossDomainAcknowledgementAndResponse:100">
+        <ID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">00000000-0000-4000-8000-000000000000</ID>
+        <IssueDateTime xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <DateTimeString xmlns="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100" format="204">20260918100011</DateTimeString>
+        </IssueDateTime>
+        <SenderTradeParty xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <GlobalID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" schemeID="0238"/>
+            <RoleCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">WK</RoleCode>
+        </SenderTradeParty>
+        <IssuerTradeParty xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <GlobalID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" schemeID="0002">999999999</GlobalID>
+            <Name xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">Buyer of the test</Name>
+            <RoleCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">BY</RoleCode>
+        </IssuerTradeParty>
+        <RecipientTradeParty xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <GlobalID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" schemeID="0002">888888888</GlobalID>
+            <RoleCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">SE</RoleCode>
+            <URIUniversalCommunication xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+                <URIID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" schemeID="0002">888888888</URIID>
+            </URIUniversalCommunication>
+        </RecipientTradeParty>
+    </ExchangedDocument>
+    <AcknowledgementDocument xmlns="urn:un:unece:uncefact:data:standard:CrossDomainAcknowledgementAndResponse:100">
+        <MultipleReferencesIndicator xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <Indicator xmlns="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">false</Indicator>
+        </MultipleReferencesIndicator>
+        <TypeCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">23</TypeCode>
+        <IssueDateTime xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <DateTimeString xmlns="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100" format="204">20260918100011</DateTimeString>
+        </IssueDateTime>
+        <ReferenceReferencedDocument xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+            <IssuerAssignedID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">EINV-TEST-1020-REF</IssuerAssignedID>
+            <StatusCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">47</StatusCode>
+            <TypeCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">380</TypeCode>
+            <ReceiptDateTime xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+                <DateTimeString xmlns="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100" format="204">20260901120000</DateTimeString>
+            </ReceiptDateTime>
+            <ReferenceTypeCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">urn.cpro.gouv.fr:1p0:CDV:einvoicingF2</ReferenceTypeCode>
+            <FormattedIssueDateTime xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+                <DateTimeString xmlns="urn:un:unece:uncefact:data:standard:QualifiedDataType:100" format="204">20260901120000</DateTimeString>
+            </FormattedIssueDateTime>
+            <ProcessConditionCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">211</ProcessConditionCode>
+            <ProcessCondition xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">Paiement transmis</ProcessCondition>
+            <IssuerTradeParty>
+                <GlobalID xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" schemeID="0002">888888888</GlobalID>
+                <RoleCode xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">SE</RoleCode>
+            </IssuerTradeParty>
+            <SpecifiedDocumentStatus xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+                <SequenceNumeric xmlns="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">0</SequenceNumeric>
+            </SpecifiedDocumentStatus>
+        </ReferenceReferencedDocument>
+    </AcknowledgementDocument>
+</CrossDomainAcknowledgementAndResponse>

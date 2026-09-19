@@ -220,9 +220,10 @@ class SupplierInvoiceStatusFromCdarTest extends CommonClassTest
 	 *
 	 * @param	string							$direction			Direction of the flow, 'In' or 'Out'
 	 * @param	array<int,array<string,mixed>>	$cannedResponses	Answers callApi() hands back, in order
+	 * @param	?Document						$document			Set to the flow document the method completed
 	 * @return	array<string,mixed>									Return of processSupplierInvoiceStatusFromCdar()
 	 */
-	private function processFlow($direction, $cannedResponses)
+	private function processFlow($direction, $cannedResponses, &$document = null)
 	{
 		global $db;
 
@@ -289,6 +290,30 @@ class SupplierInvoiceStatusFromCdarTest extends CommonClassTest
 		$this->assertSame(1, $res['postponeflow']);
 		$this->assertSame('CANT_READ_INCOMING_LIFECYCLE_STATUS', $res['actioncode']);
 		$this->assertNotSame('CantReadTheStatusSentByTheVendor', $res['businessmessage'], 'Translation key is missing from the lang file');
+	}
+
+	/**
+	 * A CDAR issued by the web interface of an access point, which is the case this fallback exists
+	 * for. Every element of it sits in a DEFAULT namespace, with no prefix anywhere, unlike the one
+	 * the module writes - so it is what proves the xpath of CdarHandler reads such a document:
+	 * matching is on the namespace URI, not on the prefix. No invoice carries that reference here, so
+	 * the run stops on the lookup, naming the reference it read.
+	 *
+	 * @return void
+	 */
+	public function testStatusIssuedByTheAccessPointInterfaceIsReadFromItsCdar()
+	{
+		$cdar = (string) file_get_contents(__DIR__ . '/fixtures/received/lifecycle_cdar_from_access_point_ui.xml');
+
+		$document = null;
+		$res = $this->processFlow('Out', array(
+			array('status_code' => 200, 'response' => $cdar),
+		), $document);
+
+		$this->assertSame(0, $res['res']);
+		$this->assertStringContainsString('EINV-TEST-1020-REF', $res['message'], 'The vendor reference of the CDAR was not read');
+		$this->assertSame('211', (string) $document->cdar_lifecycle_code);
+		$this->assertSame('Paiement transmis', (string) $document->cdar_lifecycle_label);
 	}
 
 	/**
