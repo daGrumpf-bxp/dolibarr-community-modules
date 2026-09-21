@@ -1647,4 +1647,59 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 			array('indicator' => 'false', 'actualAmount' => 5.00, 'reason' => 'Commercial gesture', 'rateApplicablePercent' => 20.0),
 		)));
 	}
+
+	/**
+	 * The writer of the import totals every line through the core, which reads the vendor of the invoice
+	 * to resolve the VAT rate and its local taxes. Neither create() nor fetch() loads that vendor - fetch()
+	 * even clears it - so it used to arrive empty and the core fell back on our own company, reading the
+	 * rate in the wrong country. The vendor is now loaded before the first line is written (issue #1022).
+	 *
+	 * @return	void
+	 */
+	public function testTheVendorIsLoadedBeforeTheLinesAreTotalled()
+	{
+		global $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		// A vendor in another country than ours: that country is precisely what the core looks the VAT
+		// rate of the line up with, through getLocalTaxesFromRate().
+		$vendor = new Societe($db);
+		$vendor->name = 'Vendor 1022 ' . strtoupper(bin2hex(random_bytes(4)));
+		$vendor->fournisseur = 1;
+		$vendor->country_id = (int) dol_getIdFromCode($db, 'ES', 'c_country', 'code', 'rowid');
+		$socid = $vendor->create($user);
+		$this->assertGreaterThan(0, $socid, $vendor->errorsToString());
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->socid = $socid;
+		$invoice->ref_supplier = 'T1022' . strtoupper(bin2hex(random_bytes(4)));
+		$invoice->date = dol_now();
+		// The writer reads $this->special_code, a property the class does not declare on Dolibarr 18
+		$invoice->special_code = 0;
+		$invoiceId = $invoice->create($user);
+		$this->assertGreaterThan(0, $invoiceId, $invoice->errorsToString());
+
+		// The state the import hands the writer, and the whole point of the fix: creating an invoice
+		// does not load its vendor.
+		$this->assertTrue(empty($invoice->thirdparty), 'create() is not expected to load the vendor of the invoice');
+
+		$line = new SupplierInvoiceLine($db);
+		$line->desc = 'Line of issue 1022';
+		$line->qty = 1;
+		$line->subprice = 100.0;
+		$line->tva_tx = 21.0;
+		$line->product_type = 1;
+		$line->remise_percent = 0;
+		$line->special_code = 0;
+		$invoice->lines = array($line);	// @phpstan-ignore assign.propertyType
+
+		$protocol = new CIIProtocol($db);
+		$this->assertTrue($protocol->createSupplierInvoiceLinesIntoDatabase($invoice));
+
+		$this->assertNotEmpty($invoice->thirdparty, 'the vendor must be loaded before the lines are totalled');
+		$this->assertSame($socid, (int) $invoice->thirdparty->id);
+		$this->assertSame('ES', $invoice->thirdparty->country_code);
+	}
 }
