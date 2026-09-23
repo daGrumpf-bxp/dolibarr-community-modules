@@ -146,6 +146,11 @@ jobs:
           php .github/scripts/activate-einvoicing.php
           php .github/scripts/activate-einvoicing.php
 
+      - name: Set the module up the way a user does
+        # The tests run on a module with its setup filled, as on any real instance and on the benches
+        # the module is tested on: left unset, a test reading the setup is green there and red here.
+        run: php .github/scripts/configure-einvoicing.php
+
       - name: Run the test files, one by one
         # One process per file, the way the module is tested on a bench: a fatal in one file then
         # takes that file down and not the whole suite, and the summary below says which ones failed
