@@ -797,6 +797,58 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
+	 * The files of the tab of the module go out as additional supporting documents (BG-24), from EN16931
+	 * up only, one node per file, BT-123 written only when a code was chosen, in the schema order.
+	 *
+	 * @return void
+	 */
+	public function testAttachedFilesFollowTheProfileSchema()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$data = $this->invoiceDataWithReferences();
+		$data['_attachedFiles'] = [
+			['filename' => 'delivery proof.pdf', 'mimecode' => 'application/pdf', 'code' => 'BON_LIVRAISON', 'content' => base64_encode('%PDF-1.4 one')],
+			['filename' => 'site.png', 'mimecode' => 'image/png', 'code' => '', 'content' => base64_encode('png two')],
+		];
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$doc = new DOMDocument();
+			$doc->loadXML($protocol->buildXML($data, $this->baseLinesData(), $profile));
+			$xpath = new DOMXPath($doc);
+			$xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+			$nodes = $xpath->query('//ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument[ram:TypeCode="916"]');
+
+			if (!in_array($profile, ['EN16931', 'EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(0, $nodes->length, $profile . ' does not declare BG-24');
+				continue;
+			}
+			$this->assertSame(2, $nodes->length, $profile . ' one BG-24 per file');
+
+			$first = $nodes->item(0);
+			$children = [];
+			foreach ($first->childNodes as $child) {
+				if ($child instanceof DOMElement) {
+					$children[] = $child->localName;
+				}
+			}
+			$this->assertSame(['IssuerAssignedID', 'TypeCode', 'Name', 'AttachmentBinaryObject'], $children, $profile . ' ReferencedDocumentType order');
+			$binary = $xpath->query('ram:AttachmentBinaryObject', $first)->item(0);
+			$this->assertSame('application/pdf', $binary->getAttribute('mimeCode'));
+			$this->assertSame('delivery proof.pdf', $binary->getAttribute('filename'));
+			$this->assertSame('%PDF-1.4 one', base64_decode($binary->nodeValue));
+			$this->assertSame('BON_LIVRAISON', $xpath->query('ram:Name', $first)->item(0)->nodeValue);
+
+			// No code chosen: no BT-123 at all, an empty or free text one would break BR-FR-17
+			$this->assertSame(0, $xpath->query('ram:Name', $nodes->item(1))->length, $profile . ' BT-123 without a code');
+
+			// The order references (TypeCode 130) are still there, before the attachments
+			$this->assertSame(2, $xpath->query('//ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument[ram:TypeCode="130"]')->length);
+		}
+	}
+
+	/**
 	 * The project reference (BT-11) only exists from EN16931 up, and its type makes both ram:ID and
 	 * ram:Name mandatory.
 	 *
