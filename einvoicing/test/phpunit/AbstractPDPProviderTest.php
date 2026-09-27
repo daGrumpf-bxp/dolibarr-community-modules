@@ -162,4 +162,121 @@ class AbstractPDPProviderTest extends CommonClassTest
 		$this->assertNotSame(false, $decoded, 'What is stored of a binary payload can still be decoded');
 		$this->assertSame(substr($big, 0, strlen($decoded)), $decoded, 'It decodes to the beginning of the payload');
 	}
+
+	/**
+	 * A provider whose calls to the access point are answered from a fixed list, and counted.
+	 *
+	 * @param	array<string,array{status_code:int,response:string}>	$answers	Answer by docType
+	 * @param	string[]	$asked		Filled with each docType asked for
+	 * @return	AbstractPDPProvider
+	 */
+	private function providerAnswering(array $answers, array &$asked)
+	{
+		$provider = new class ($answers, $asked) extends TestPDPProvider {
+			/** @var array<string,array{status_code:int,response:string}> */
+			public $answers;
+			/** @var string[] */
+			public $asked;
+
+			/**
+			 * @param array<string,array{status_code:int,response:string}> $answers Answer by docType
+			 * @param string[] $asked Filled with each docType asked for
+			 */
+			public function __construct(array $answers, array &$asked)
+			{
+				$this->answers = $answers;
+				$this->asked = &$asked;
+			}
+
+			/**
+			 * @param string $flowId Flow
+			 * @param string $docType Doc type
+			 * @param string $callType Call type
+			 * @return array{status_code:int,response:string}
+			 */
+			public function fetchFlowData($flowId, $docType, $callType = '')
+			{
+				$this->asked[] = $docType;
+				return $this->answers[$docType] ?? array('status_code' => 404, 'response' => '');
+			}
+		};
+
+		return $provider;
+	}
+
+	/**
+	 * Call the protected fetchOtherReceivedFormats() of AbstractPDPProvider.
+	 *
+	 * @param	AbstractPDPProvider	$provider	The provider
+	 * @param	array<string,mixed>	$importable	What fetchImportableFlowDocument() returned
+	 * @return	array<string,string>
+	 */
+	private function otherFormats($provider, array $importable)
+	{
+		$method = new ReflectionMethod('AbstractPDPProvider', 'fetchOtherReceivedFormats');
+		$method->setAccessible(true);
+
+		return $method->invoke($provider, 'flow1', $importable);
+	}
+
+	/**
+	 * Without the option, nothing more is asked of the access point (issue #980).
+	 *
+	 * @return	void
+	 */
+	public function testOtherFormatsAreNotFetchedWithoutTheOption()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_SAVE_ALL_RECEIVED_FORMATS = 0;
+		$asked = array();
+		$provider = $this->providerAnswering(array('Original' => array('status_code' => 200, 'response' => '<Invoice/>')), $asked);
+
+		$this->assertSame(array(), $this->otherFormats($provider, array('doc_type' => 'Converted', 'documents' => array())));
+		$this->assertSame(array(), $asked);
+	}
+
+	/**
+	 * With the option, the format that was not imported is fetched and handed back.
+	 *
+	 * @return	void
+	 */
+	public function testTheOriginalIsFetchedBesideTheConverted()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_SAVE_ALL_RECEIVED_FORMATS = 1;
+		$asked = array();
+		$provider = $this->providerAnswering(array('Original' => array('status_code' => 200, 'response' => '<Invoice/>')), $asked);
+
+		$others = $this->otherFormats($provider, array('doc_type' => 'Converted', 'documents' => array('Converted' => '<rsm/>')));
+		$conf->global->EINVOICING_SAVE_ALL_RECEIVED_FORMATS = 0;
+
+		$this->assertSame(array('Original' => '<Invoice/>'), $others);
+		$this->assertSame(array('Original'), $asked);
+	}
+
+	/**
+	 * A document the import already fetched is not asked for twice, and a failure is not fatal.
+	 *
+	 * @return	void
+	 */
+	public function testAnAlreadyFetchedFormatIsReusedAndAFailureSkipped()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_SAVE_ALL_RECEIVED_FORMATS = 1;
+		$asked = array();
+		$provider = $this->providerAnswering(array(), $asked);
+
+		// The Converted was fetched but unreadable, the Original was imported
+		$reused = $this->otherFormats($provider, array('doc_type' => 'Original', 'documents' => array('Converted' => '<rsm/>', 'Original' => '<Invoice/>')));
+		// Nothing was fetched, and the access point answers 404 for the Converted
+		$failed = $this->otherFormats($provider, array('doc_type' => 'Original', 'documents' => array()));
+		$conf->global->EINVOICING_SAVE_ALL_RECEIVED_FORMATS = 0;
+
+		$this->assertSame(array('Converted' => '<rsm/>'), $reused);
+		$this->assertSame(array(), $failed);
+		$this->assertSame(array('Converted'), $asked);
+	}
 }

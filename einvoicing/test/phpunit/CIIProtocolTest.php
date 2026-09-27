@@ -752,4 +752,18 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertSame('CB', $codes['48'] ?? null, 'bank card');
 		$this->assertSame('PRE', $codes['49'] ?? null, 'direct debit');
 	}
+
+	/**
+	 * A received document is named after the format it was fetched as, the former name when unknown (#980).
+	 *
+	 * @return	void
+	 */
+	public function testAReceivedDocumentIsNamedAfterItsFormat()
+	{
+		$this->assertSame('original', CIIProtocol::receivedDocumentSuffix('Original'));
+		$this->assertSame('converted', CIIProtocol::receivedDocumentSuffix('Converted'));
+		$this->assertSame('readableview', CIIProtocol::receivedDocumentSuffix('ReadableView'));
+		$this->assertSame('einvoice', CIIProtocol::receivedDocumentSuffix(''));
+		$this->assertSame('einvoice', CIIProtocol::receivedDocumentSuffix('../x'));
+	}
 }
