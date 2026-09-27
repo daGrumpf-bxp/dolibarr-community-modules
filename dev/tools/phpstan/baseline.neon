@@ -1077,7 +1077,13 @@ parameters:
 		-
 			message: '#^Dead catch \- Exception is never thrown in the try block\.$#'
 			identifier: catch.neverThrown
-			count: 3
+			count: 1
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
+			message: '#^Dead catch \- Exception is never thrown in the try block\.$#'
+			identifier: catch.neverThrown
+			count: 2
 			path: ../../../einvoicing/class/providers/EsalinkPDPProvider.class.php
 
 		-
@@ -1137,7 +1143,7 @@ parameters:
 		-
 			message: '#^Dead catch \- Exception is never thrown in the try block\.$#'
 			identifier: catch.neverThrown
-			count: 3
+			count: 2
 			path: ../../../einvoicing/class/providers/SuperPDPProvider.class.php
 
 		-
