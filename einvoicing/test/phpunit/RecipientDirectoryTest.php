@@ -1120,7 +1120,107 @@ class RecipientDirectoryTest extends CommonClassTest
 
 		$this->assertSame('unknownaddress', $result['status']);
 		$this->assertSame(0, $result['reachable']);
-		// Only the standardized search was called: the answer needed no tie-breaker.
-		$this->assertSame(array('afnor-directory/v1/directory-line/search'), $provider->calledResources);
+		// Only the standardized search was called (the page, then the address by its identifier): no tie-breaker.
+		$this->assertSame(array('afnor-directory/v1/directory-line/search', 'afnor-directory/v1/directory-line/search'), $provider->calledResources);
+	}
+
+	/**
+	 * Build a provider double whose directory search answers a first page, then the exact search.
+	 *
+	 * @param	array<int,array<string,mixed>>	$page		Lines of the first page
+	 * @param	?array<int,array<string,mixed>>	$exact		Lines of the exact search, null for a failing call
+	 * @return	FakeDirectoryPDPProvider
+	 */
+	private function providerReturningPageThenExact($page, $exact)
+	{
+		global $db;
+
+		$provider = new FakeDirectoryPDPProvider($db);
+		$provider->cannedResponses = array(
+			array('status_code' => 200, 'response' => array('results' => $page, 'totalNumberOfResults' => 3000)),
+			$exact === null ? array('status_code' => 500, 'response' => '') : array('status_code' => 200, 'response' => array('results' => $exact)),
+		);
+
+		return $provider;
+	}
+
+	/**
+	 * A first page of 25 State services, sorted, none of them the addressed one.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function stateFirstPage()
+	{
+		$page = array();
+		for ($i = 0; $i < 25; $i++) {
+			$page[] = array('addressingIdentifier' => '110002011_11000201100044_AA' . sprintf('%08d', $i), 'directoryLineStatus' => 'Enabled', 'siren' => '110002011');
+		}
+		return $page;
+	}
+
+	/**
+	 * #1144: the search answers one page of 25 lines, and the French State declares one line per service.
+	 * An enabled service beyond that page is found by asking for its exact identifier.
+	 *
+	 * @return void
+	 */
+	public function testAnAddressBeyondTheFirstPageIsFoundByItsIdentifier()
+	{
+		$provider = $this->providerReturningPageThenExact($this->stateFirstPage(), array(
+			array('addressingIdentifier' => '110002011_11000201100044_D18118Q018', 'directoryLineStatus' => 'Enabled', 'platformType' => 'DFH', 'siren' => '110002011'),
+		));
+
+		$result = $provider->checkRecipientDirectory('110002011', '110002011_11000201100044_D18118Q018');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertSame(1, $result['reachable']);
+		$this->assertSame('110002011_11000201100044_D18118Q018', $result['identifier']);
+		$this->assertSame('DFH', $result['platform']);
+		$this->assertCount(2, $provider->calledResources);
+	}
+
+	/**
+	 * #1144: the exact search does not know the address either, so it stays undeclared.
+	 *
+	 * @return void
+	 */
+	public function testAnAddressUnknownToTheExactSearchStaysUndeclared()
+	{
+		$provider = $this->providerReturningPageThenExact($this->stateFirstPage(), array());
+
+		$result = $provider->checkRecipientDirectory('110002011', '110002011_11000201100044_ZZZZZZZZZZ');
+
+		$this->assertSame('unknownaddress', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+	}
+
+	/**
+	 * #1144: a failing exact search changes nothing, the address stays undeclared as before.
+	 *
+	 * @return void
+	 */
+	public function testAFailingExactSearchLeavesTheAddressUndeclared()
+	{
+		$provider = $this->providerReturningPageThenExact($this->stateFirstPage(), null);
+
+		$result = $provider->checkRecipientDirectory('110002011', '110002011_11000201100044_D18118Q018');
+
+		$this->assertSame('unknownaddress', $result['status']);
+		$this->assertSame(0, $result['reachable']);
+	}
+
+	/**
+	 * #1144: an address already in the first page costs no second call.
+	 *
+	 * @return void
+	 */
+	public function testAnAddressInTheFirstPageNeedsNoSecondCall()
+	{
+		$provider = $this->providerReturningPageThenExact($this->stateFirstPage(), array());
+
+		$result = $provider->checkRecipientDirectory('110002011', '110002011_11000201100044_AA00000003');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertCount(1, $provider->calledResources);
 	}
 }
