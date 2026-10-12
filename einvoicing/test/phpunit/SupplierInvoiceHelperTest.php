@@ -946,6 +946,33 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * A credit note its vendor signed like an invoice announces a negative total: it is recorded as sent,
+	 * so the stored credit note carries the signs of its document instead of their opposite (PR #1077).
+	 *
+	 * @return void
+	 */
+	public function testACreditNoteAnnouncedNegativeKeepsTheSignOfItsDocument()
+	{
+		global $db;
+
+		$this->assertSame(-1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE, 120.00));
+		$this->assertSame(-1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE), 'a total not known leaves the usual sign');
+		$this->assertSame(1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE, -72.80));
+		$this->assertSame(1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_STANDARD, -72.80), 'an invoice always carries the sign of its document');
+
+		$creditNote = new FactureFournisseur($db);
+		$creditNote->type = FactureFournisseur::TYPE_CREDIT_NOTE;
+		$creditNote->total_tva = 3.20;
+		$creditNote->total_ttc = -72.80;
+
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 3.20, -72.80));
+
+		$creditNote->total_tva = -3.20;
+		$creditNote->total_ttc = 72.80;
+		$this->assertFalse(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 3.20, -72.80), 'a credit note of the opposite sign is not the document');
+	}
+
+	/**
 	 * An invoice the import could not reproduce is not one to approve: approving it commits to paying
 	 * a figure the vendor did not bill. Refusing it stays offered - that is the answer it deserves.
 	 *

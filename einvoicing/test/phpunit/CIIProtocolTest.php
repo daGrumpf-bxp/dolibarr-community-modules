@@ -1335,4 +1335,54 @@ class CIIProtocolTest extends CommonClassTest
 
 		$this->assertSame($id, SupplierInvoiceHelper::findIdByRef($rebuilt->ref_supplier, $socid), 'and no second invoice carries the document');
 	}
+
+	/**
+	 * A credit note its vendor signed like an invoice (PR #1077) is recorded as sent: the fee it charges
+	 * stays positive, the deposit it refunds negative, and the credit note totals BT-115, -72.80. The two
+	 * core options that keep the sign of a credit note line change nothing to it.
+	 *
+	 * @return void
+	 */
+	public function testACreditNoteSignedLikeAnInvoiceIsRecordedAsSent()
+	{
+		global $conf, $db;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION', 'FACTURE_ENABLE_NEGATIVE_LINES', 'INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		$this->createFixtureSeller();
+		$fixture = (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_credit_note_signed_as_invoice.xml');
+
+		foreach (array(0, 1) as $keepSign) {
+			$conf->global->FACTURE_ENABLE_NEGATIVE_LINES = $keepSign;
+			$conf->global->INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN = $keepSign;
+			$xml = str_replace('EINV1077-0001', 'EINV1077-' . strtoupper(bin2hex(random_bytes(4))), $fixture);
+
+			$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($xml, null, 'test1077');
+			$id = (int) ($res['res'] ?? 0);
+			$this->assertGreaterThan(0, $id, 'options ' . $keepSign . ': ' . strip_tags((string) ($res['message'] ?? '')));
+			$this->createdInvoiceIds[] = $id;
+			$this->assertStringContainsString('carries amounts with the sign the vendor gave them', (string) $res['message']);
+
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch($id);
+			$invoice->fetch_lines();
+			$this->assertSame(FactureFournisseur::TYPE_CREDIT_NOTE, (int) $invoice->type);
+			$this->assertEquals(-76.00, (float) $invoice->total_ht, 'options ' . $keepSign);
+			$this->assertEquals(3.20, (float) $invoice->total_tva, 'the VAT of the fee it charges');
+			$this->assertEquals(-72.80, (float) $invoice->total_ttc);
+			$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks($id), 'nothing holds its validation back');
+
+			$byRate = array();
+			foreach ($invoice->lines as $line) {
+				if ((float) $line->total_ht != 0) {
+					$this->assertSame($line->total_ht > 0, $line->subprice > 0, 'a line and its unit price carry the same sign');
+				}
+				$byRate[(string) price2num($line->tva_tx)] = ($byRate[(string) price2num($line->tva_tx)] ?? 0) + (float) $line->total_ht;
+			}
+			$this->assertEquals(array('20' => 16.00, '0' => -92.00), $byRate);
+		}
+	}
 }
