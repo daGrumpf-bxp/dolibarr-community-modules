@@ -2571,9 +2571,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 			$urlparam = '';
 		} elseif ($modulepart == 'facture_fournisseur') {
-			// Received from a supplier: <ref supplier>_<converted|original|einvoice>.xml, the names
-			// CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the files it saves
-			if (!$user->hasRight('fournisseur', 'facture', 'lire') || !preg_match('/_(converted|original|einvoice)\.xml$/', $relativepath, $matches)) {
+			// Received from a supplier: <ref supplier>_einvoice.xml, and _original.xml or _converted.xml on
+			// option, the names CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the files it saves
+			if (!$user->hasRight('fournisseur', 'facture', 'lire') || !preg_match('/_(einvoice|original|converted)\.xml$/', $relativepath, $matches)) {
 				return 0;
 			}
 			$urlparam = '&element=supplier&format='.$matches[1];
@@ -2673,7 +2673,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				return 0;
 			}
 			$targets = array();
-			foreach (array('converted', 'original', 'einvoice') as $format) {
+			foreach (array('einvoice', 'original', 'converted') as $format) {
 				$targets['_'.$format.'.xml'] = array('&element=supplier&format='.$format, $format);
 			}
 		} elseif (in_array('invoicedocument', $contexts, true)) {

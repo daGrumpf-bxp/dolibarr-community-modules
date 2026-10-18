@@ -725,11 +725,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string 			$file                       		Source string file (XML or PDF string). We use this file to get data of supplier invoice.
 	 * @param  string|null 		$readableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
-	 * @param  string			$docType							Document type $file was fetched as ('Original', 'Converted'...), names the attached file
 	 * @param  array<string,string>	$otherFormats					Other documents of the flow to keep as attached files, by docType
 	 * @return array{res:int<-1,1>, message:string, actioncode?: string|null, actionurl?: string|null, action?:string|null, created?:int}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message', an optional 'actioncode' and 'action', and 'created' set to 1 only when this call is what imported the invoice.
 	 */
-	public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '', $docType = '', $otherFormats = array())
+	public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '', $otherFormats = array())
 	{
 		global $conf, $db;
 
@@ -751,7 +750,7 @@ class CIIProtocol extends AbstractProtocol
 
 		$result = ['res' => -1, 'message' => 'Unexpected error while creating supplier invoice'];
 		try {
-			$result = $this->doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView, $docType, (array) $otherFormats);
+			$result = $this->doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView, (array) $otherFormats);
 		} finally {
 			$failed = !is_array($result) || !isset($result['res']) || $result['res'] < 0;
 			$this->cleanupIncomingTempFiles($tempDir, $tempFile, $tempFileReadableView, $failed);
@@ -1042,11 +1041,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string			$flowId               Source flow identifier
 	 * @param  string			$tempFile             Unique working file for the received XML
 	 * @param  string			$tempFileReadableView Unique working file for the readable view
-	 * @param  string			$docType              Document type $file was fetched as, names the attached file
 	 * @param  array<string,string>	$otherFormats     Other documents of the flow to keep as attached files, by docType
 	 * @return array{res:int<-1,1>, message:string, action?:string|null, created?:int}	'created' tells the caller whether this call is what brought the invoice in, or found it already imported
 	 */
-	protected function doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView, $docType = '', $otherFormats = array())
+	protected function doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView, $otherFormats = array())
 	{
 		global $db, $user, $langs;
 
@@ -1214,7 +1212,7 @@ class CIIProtocol extends AbstractProtocol
 			$this->storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
 
 			if ($tempFile && file_exists($tempFile)) {
-				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile, static::receivedDocumentSuffix($docType));
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save Einvoice file as attachment: ' . $res['message'];
@@ -1228,7 +1226,7 @@ class CIIProtocol extends AbstractProtocol
 			// Save readable view file in supplier invoice attachments
 			if ($readableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
 				$readablefileext = 'pdf';	// Usually the extension of file for the readable version is PDF
-				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, 'readableview', $readablefileext);
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'), $readablefileext);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
@@ -1544,7 +1542,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Save original invoice in supplier invoice attachments
 			if ($tempFile && file_exists($tempFile)) {
-				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile, static::receivedDocumentSuffix($docType));
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save Einvoice file as attachment: ' . $res['message'];
@@ -1559,7 +1557,7 @@ class CIIProtocol extends AbstractProtocol
 			// Save readable view file in supplier invoice attachments
 			if ($readableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
 				$readablefileext = 'pdf';	// Usually the extension of file for the readable version is PDF
-				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, 'readableview', $readablefileext);
+				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'), $readablefileext);
 
 				if ($res['res'] < 0) {
 					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
@@ -3962,25 +3960,10 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
-	 * Suffix of the attached file holding a received document: the docType it was fetched as.
-	 *
-	 * <ref_supplier>_original.<ext> and <ref_supplier>_converted.<ext> tell apart what the issuer sent
-	 * and what the access point rewrote. A document with no known docType keeps the former name.
-	 *
-	 * @param	string	$docType	'Original', 'Converted', 'ReadableView', or '' when unknown
-	 * @return	string				The suffix, without its leading underscore
-	 */
-	public static function receivedDocumentSuffix($docType)
-	{
-		if (!in_array($docType, array('Original', 'Converted', 'ReadableView'), true)) {
-			return 'einvoice';
-		}
-
-		return dol_strtolower($docType);
-	}
-
-	/**
 	 * Keep the other formats of the received flow as attached files of the supplier invoice.
+	 *
+	 * The imported document stays <ref_supplier>_einvoice.<ext>, the format agreed with the access point.
+	 * The others are added beside it as <ref_supplier>_original.<ext> or <ref_supplier>_converted.<ext>.
 	 *
 	 * @param	FactureFournisseur		$supplierInvoice	The imported supplier invoice
 	 * @param	array<string,string>	$otherFormats		Raw documents by docType, see AbstractPDPProvider::fetchOtherReceivedFormats()
@@ -3993,7 +3976,7 @@ class CIIProtocol extends AbstractProtocol
 
 		foreach ($otherFormats as $docType => $content) {
 			$content = (string) $content;
-			if ($content === '') {
+			if ($content === '' || !in_array($docType, array('Original', 'Converted'), true)) {
 				continue;
 			}
 
@@ -4005,7 +3988,7 @@ class CIIProtocol extends AbstractProtocol
 				continue;
 			}
 
-			$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempPath, static::receivedDocumentSuffix((string) $docType), $fileext);
+			$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempPath, dol_strtolower($docType), $fileext);
 			if ($res['res'] < 0) {
 				dol_delete_file($tempPath, 0, 1);
 				$return_messages[] = 'Failed to save the ' . $docType . ' document as attachment: ' . $res['message'];
@@ -5254,23 +5237,21 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Suffix an embedded attachment is stored under, in the <ref_supplier>_<suffix>.<ext> naming of the other imported files.
 	 *
-	 * <ref_supplier>_embedded_<issuer's name>.<ext> tells a file found inside the received document from
-	 * the document itself, and cannot take the name of the received document or of its readable view.
-	 *
 	 * @param  string   $filename		Name of the attachment, without extension
 	 * @param  string   $extension		Its extension
 	 * @param  int      $rank			Its rank among the attachments
 	 * @param  string[] $storednames	Names already stored by this import, with extension
-	 * @return string					embedded_<name>, followed by the rank when another attachment has it
+	 * @return string					The name itself, or followed by the rank when another attachment, the received document or its readable view has it
 	 */
 	protected function embeddedAttachmentSuffix(string $filename, string $extension, int $rank, array $storednames): string
 	{
-		$suffix = 'embedded_' . $filename;
-		if (in_array($suffix . '.' . $extension, $storednames, true)) {
-			return $suffix . '_' . ($rank + 1);
+		// The received document, its other formats and its readable view are stored after, under these names, and would overwrite it.
+		$reserved = in_array(dol_strtolower($filename), array('einvoice', 'original', 'converted', dol_strtolower(getDolGlobalString('EINVOICING_PDP', 'PDP'))), true);
+		if ($reserved || in_array($filename . '.' . $extension, $storednames, true)) {
+			return $filename . '_' . ($rank + 1);
 		}
 
-		return $suffix;
+		return $filename;
 	}
 
 	/**

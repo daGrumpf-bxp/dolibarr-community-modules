@@ -935,13 +935,13 @@ class EInvoicing
 	 * Get the path of the CII XML received for a supplier invoice, if there is one to read.
 	 *
 	 * The file is the one the reception saved beside the supplier invoice, so the naming is the one of
-	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): <ref supplier>_<suffix>.xml in the
-	 * directory of the invoice. The suffix is the docType the document was fetched as ('converted',
-	 * 'original'), or 'einvoice' for an invoice imported before the formats were told apart. A document
-	 * received in Factur-X is a PDF, which Dolibarr previews on its own and which is not concerned here.
+	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): <ref supplier>_einvoice.xml for the
+	 * imported document, <ref supplier>_original.xml or _converted.xml for the other formats kept beside
+	 * it on option. A document received in Factur-X is a PDF, which Dolibarr previews on its own and
+	 * which is not concerned here.
 	 *
 	 * @param 	FactureFournisseur 	$supplierInvoice 	Supplier invoice the document was received for.
-	 * @param	string				$suffix				'converted', 'original' or 'einvoice' for that file only, '' for the one the import read.
+	 * @param	string				$suffix				'original' or 'converted' for that other format, '' for the imported document.
 	 * @return 	string									Full path of the XML, empty string if there is none.
 	 */
 	public function getSupplierEInvoiceXmlFilePath($supplierInvoice, $suffix = '')
@@ -952,23 +952,19 @@ class EInvoicing
 			return '';
 		}
 
-		if ($suffix !== '') {
-			if (!in_array($suffix, array('converted', 'original', 'einvoice'), true)) {
-				return '';
-			}
-			$suffixes = array($suffix);
-		} else {
-			// The one the import read first: the order AbstractPDPProvider::fetchImportableFlowDocument() tries
-			$suffixes = getDolGlobalString('EINVOICING_PREFER_ORIGINAL') ? array('original', 'converted', 'einvoice') : array('converted', 'original', 'einvoice');
+		if ($suffix === '') {
+			$suffix = 'einvoice';
+		} elseif (!in_array($suffix, array('einvoice', 'original', 'converted'), true)) {
+			return '';
 		}
 
 		$base = $conf->fournisseur->dir_output . '/facture/';
-		$dir = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . dol_sanitizeFileName($supplierInvoice->ref) . '/';
-		foreach ($suffixes as $oneSuffix) {
-			$path = $dir . dol_sanitizeFileName($supplierInvoice->ref_supplier . '_' . $oneSuffix . '.xml');
-			if (is_readable($path)) {
-				return $path;
-			}
+		$ref = dol_sanitizeFileName($supplierInvoice->ref);
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_' . $suffix . '.xml');
+
+		$path = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref . '/' . $filename;
+		if (is_readable($path)) {
+			return $path;
 		}
 
 		return '';
