@@ -284,6 +284,29 @@ class AbstractPDPProviderTest extends CommonClassTest
 	}
 
 	/**
+	 * A CDAR without ProcessCondition (optional, left out by some buyer platforms) is labelled from its code:
+	 * the document and the event title were left with an empty status ("EINVOICING - Status: ").
+	 *
+	 * @return	void
+	 */
+	public function testACdarWithoutProcessConditionIsLabelledFromItsCode()
+	{
+		global $db, $langs;
+
+		$langs->load('einvoicing@einvoicing');
+		$einvoicing = new EInvoicing($db);
+		$provider = (new ReflectionClass('TestPDPProvider'))->newInstanceWithoutConstructor();
+		$method = new ReflectionMethod('AbstractPDPProvider', 'cdarLifecycleLabel');
+		$method->setAccessible(true);
+		$expected = $einvoicing->getStatusLabel(205, 'facture');
+
+		$this->assertNotSame('', $expected);
+		$this->assertSame($expected, $method->invoke($provider, array('ProcessConditionCode' => '205'), $einvoicing, 'facture'));
+		$this->assertSame($expected, $method->invoke($provider, array('ProcessConditionCode' => '205', 'ProcessCondition' => ''), $einvoicing, 'facture'));
+		$this->assertSame('Approuvee', $method->invoke($provider, array('ProcessConditionCode' => '205', 'ProcessCondition' => 'Approuvee'), $einvoicing, 'facture'), 'The label the CDAR carries is kept');
+	}
+
+	/**
 	 * A binary payload is base64-encoded, and what is stored of it decodes: the trace is cut on a
 	 * 4-character boundary, not in the middle of an encoded group.
 	 *

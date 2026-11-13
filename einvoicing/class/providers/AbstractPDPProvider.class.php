@@ -1386,6 +1386,23 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Label of the lifecycle status a CDAR carries. ProcessCondition is optional: a platform that leaves it out
+	 * gets the label of its code, not an empty one in the document and in the event title.
+	 *
+	 * @param	array<string,mixed>	$refDoc			ReferenceReferencedDocument of the parsed CDAR
+	 * @param	EInvoicing			$einvoicing		E-invoicing helper
+	 * @param	string				$elementType	Element the status is about ('facture', 'invoice_supplier')
+	 * @return	string								Label of the status
+	 */
+	protected function cdarLifecycleLabel($refDoc, $einvoicing, $elementType)
+	{
+		if (!empty($refDoc['ProcessCondition'])) {
+			return (string) $refDoc['ProcessCondition'];
+		}
+		return $einvoicing->getStatusLabel($refDoc['ProcessConditionCode'] ?? '', $elementType);
+	}
+
+	/**
 	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
 	 * invoice it refers to.
 	 *
@@ -1457,7 +1474,7 @@ abstract class AbstractPDPProvider
 		$refDoc = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'];
 
 		$document->cdar_lifecycle_code = $refDoc['ProcessConditionCode'];
-		$document->cdar_lifecycle_label = isset($refDoc['ProcessCondition']) ? $refDoc['ProcessCondition'] : '';
+		$document->cdar_lifecycle_label = $this->cdarLifecycleLabel($refDoc, $einvoicing, 'invoice_supplier');
 		$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
 		$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
 		$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';

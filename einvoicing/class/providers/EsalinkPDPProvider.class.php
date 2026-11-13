@@ -1591,7 +1591,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 					// Fill CDAR information in the document
 					$document->cdar_lifecycle_code = $refDoc['ProcessConditionCode'];
-					$document->cdar_lifecycle_label = $refDoc['ProcessCondition'];
+					$document->cdar_lifecycle_label = $this->cdarLifecycleLabel($refDoc, $einvoicing, 'facture');
 					$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
 					$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
 					$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
